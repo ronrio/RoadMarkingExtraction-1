@@ -2,6 +2,7 @@
 #define SEGMENTATION_H
 
 #include "utility.h"
+#include <cfloat>
 
 using namespace std;
 

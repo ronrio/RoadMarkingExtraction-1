@@ -3,11 +3,16 @@
 
 
 #include "utility.h"
+#include <numeric>
 
 //pcl
 #include <pcl/point_cloud.h>  
 #include <pcl/point_types.h>  
 #include <pcl/io/pcd_io.h> 
+
+//boost
+#include <boost/filesystem.hpp>
+
 
 //opencv
 #include <opencv2/opencv.hpp>   

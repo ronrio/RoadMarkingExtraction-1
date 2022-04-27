@@ -16,6 +16,8 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/function.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/thread.hpp>
 
 // #include <gdal.h>
 // #include <gdal_alg.h>
@@ -128,6 +130,7 @@ namespace roadmarking
 
 		//display
 		void displayroad(const pcXYZIPtr &ngcloud, const pcXYZIPtr &gcloud);
+		void displayGroundwithIntensities(const pcXYZIPtr &gcloud);
 		void displaymark(const vector<pcXYZI> &clouds);
 		void displaymarkwithng(const vector<pcXYZI> &clouds, const pcXYZIPtr &ngcloud);
 		void displaymarkbycategory(const vector<pcXYZI> &clouds, const RoadMarkings &roadmarkings);

@@ -11,7 +11,7 @@
 //#include <pcl/visualization/cloud_viewer.h>
 
 #include "utility.h"
-
+#include <cfloat>
 
 //Reference: Two-step adaptive extraction method for ground points and breaklines from lidar point clouds, Bisheng Yang, Ronggang Huang, et al. ISPRS Journal of Photogrammetry and Remote Sensing
 namespace roadmarking

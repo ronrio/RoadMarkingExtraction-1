@@ -3,6 +3,7 @@
 
 #include <pcl/kdtree/kdtree_flann.h>
 #include "utility.h"
+#include <boost/smart_ptr/make_shared.hpp>
 
 using namespace std;
 
