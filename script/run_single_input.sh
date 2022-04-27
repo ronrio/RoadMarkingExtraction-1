@@ -1,4 +1,4 @@
-single_file=./0000000018.pcd
+single_file=./sample_data/0000000018.pcd
 
 # road_type=highway
 road_type=urban

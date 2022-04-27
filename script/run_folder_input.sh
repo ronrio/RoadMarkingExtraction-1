@@ -1,7 +1,7 @@
 #gdb --args 
 
 #folder path 
-infolder=pcds
+infolder=sample_data
 outfolder=pcds_out/
 
 # road_type=highway

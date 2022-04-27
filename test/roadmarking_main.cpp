@@ -11,60 +11,6 @@ using namespace std;
 using namespace roadmarking;
 using namespace cv;
 
-// unsigned int text_id = 0;
-// void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event,
-//                             void* viewer_void)
-// {
-//   pcl::visualization::PCLVisualizer *viewer = static_cast<pcl::visualization::PCLVisualizer *> (viewer_void);
-//   if (event.getKeySym () == "r" && event.keyDown ())
-//   {
-//     std::cout << "r was pressed => removing all text" << std::endl;
-
-//     char str[512];
-//     for (unsigned int i = 0; i < text_id; ++i)
-//     {
-//       sprintf (str, "text#%03d", i);
-//       viewer->removeShape (str);
-//     }
-//     text_id = 0;
-//   }
-// }
-
-//  void displayCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, const std::string& window_name)
-// {
-//     if (cloud->size() < 1)
-//     {
-//         std::cout << window_name << " display failure. Cloud contains no points\n";
-//         return;
-//     }
-
-//     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer(window_name));
-//     pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointXYZI> point_cloud_color_handler(cloud, "intensity");
-
-//     viewer->addPointCloud< pcl::PointXYZI >(cloud, point_cloud_color_handler, "id");
-//     viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "id");
-//     viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)viewer.get());
-
-//     while (!viewer->wasStopped()){
-//         viewer->spinOnce(50);
-//     }
-//     viewer->close();
-// }
-
-// Reading Cloud information with intensity
-void print_cloud_stats(pcXYZIPtr cloud){
-    std::cout << "Loaded "
-            << cloud->width * cloud->height
-            << " data points from test_pcd.pcd with the following fields: "
-            << std::endl;
-    // for (const auto& point: *cloud)
-    //     std::cout << "    " << point.x
-    //             << " "    << point.y
-    //             << " "    << point.z
-    //             << " "    << point.intensity
-    //             << std::endl;
-    // displayCloud(cloud, "Intensity Viewer");
-}
 int main(int argc, char *argv[])
 {
     if (argc < 3)
@@ -186,7 +132,13 @@ int main(int argc, char *argv[])
     if (!strcmp(extension.c_str(), "las"))
         io.readLasFile(inputFilePath, *cloud, bound_3d_temp);
     else if (!strcmp(extension.c_str(), "pcd"))
-        io.readPcdFile(inputFilePath, cloud, bound_3d_temp);
+        {
+            io.readPcdFile(inputFilePath, cloud, bound_3d_temp);
+            std::cout << "Loaded Points after file reading: "
+                << cloud->points.size()
+                << std::endl;
+            io.displayRoadwithIntensities(cloud, 0.7, 0);                           //  Display Road Point Cloud with their respective intensities
+        }
     else 
         printf("Unrecognized data format. Please use *.pcd or *.las format point cloud.\n");
     
@@ -216,8 +168,6 @@ int main(int argc, char *argv[])
     ground.Extract_ground_pts(cloud, gcloud, ngcloud, bounds, center);
     // cout << "Ground: " << gcloud->points.size() << ", "
     //      << "Non-Ground: " << ngcloud->points.size() << endl;
-    // Get the Ground Cloud data Stats
-    print_cloud_stats(gcloud);
     cout << "Ground Segmentation done.\n";
 
     //Method 2: PMF (Slow)
@@ -410,11 +360,11 @@ int main(int argc, char *argv[])
     //Display Results
     if (io.paralist.visualization_on)
     {
-        io.displayroad(ngcloud, gcloud);                                              //Display non-ground and ground cloud
-        io.displaymarkwithng(outcloud_otsu_sor_n, ngcloud);          //Display road markings point clouds with non-ground cloud
-        io.displaymarkbycategory(outcloud_otsu_sor_n, roadmarkings); //Display road markings point clouds rendered by category
+        // io.displayroad(ngcloud, gcloud);                                              //Display non-ground and ground cloud
+        // io.displaymarkwithng(outcloud_otsu_sor_n, ngcloud);          //Display road markings point clouds with non-ground cloud
+        // io.displaymarkbycategory(outcloud_otsu_sor_n, roadmarkings); //Display road markings point clouds rendered by category
         //io.displaymarkVect(roadmarkings, sideline_roadmarkings);                        //Display vectorized road markings
-        io.displayGroundwithIntensities(gcloud);                        // Display Ground Point Cloud with their respective intensities    
+        io.displayGroundwithIntensities(gcloud, 0.5, 0);                        // Display Ground Point Cloud with their respective intensities    
     }
 
     return 1;

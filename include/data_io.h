@@ -130,7 +130,8 @@ namespace roadmarking
 
 		//display
 		void displayroad(const pcXYZIPtr &ngcloud, const pcXYZIPtr &gcloud);
-		void displayGroundwithIntensities(const pcXYZIPtr &gcloud);
+		void displayGroundwithIntensities(const pcXYZIPtr &gcloud, const float &intensity_limit, const float &elevation_limit);
+		void displayRoadwithIntensities(const pcXYZIPtr &road_cloud, const float &intensity_limit, const float &elevation_limit);
 		void displaymark(const vector<pcXYZI> &clouds);
 		void displaymarkwithng(const vector<pcXYZI> &clouds, const pcXYZIPtr &ngcloud);
 		void displaymarkbycategory(const vector<pcXYZI> &clouds, const RoadMarkings &roadmarkings);
