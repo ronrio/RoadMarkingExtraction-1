@@ -139,6 +139,7 @@ namespace roadmarking
 			for (int j = 0; j < ny; j++)
 			{
 				matrixi[i][j].push_back(0);
+			
 			}
 		}
 
@@ -160,7 +161,7 @@ namespace roadmarking
 				for (int j = 0; j < ny; j++)
 				{
 					for (auto k = GCMatrixIndice[i][j].begin(); k != GCMatrixIndice[i][j].end(); ++k) 
-						matrixi[i][j].push_back(cloud->points[*k].intensity);
+						matrixi[i][j].push_back(cloud->points[*k].intensity);			
 				}
 			}
 			break;
@@ -188,7 +189,7 @@ namespace roadmarking
 		{
 			for (int j = 0; j < ny; j++)
 			{
-				if (ave[i][j] > 1)
+				if (ave[i][j] > 1) 
 				{
 					meani += ave[i][j];
 					Number_non_zero_pixel++;
@@ -196,6 +197,9 @@ namespace roadmarking
 			}
 		}
 		meani /= Number_non_zero_pixel;
+		std::cout << "============meani /= Number_non_zero_pixel;===============" << std::endl;
+		std::cout << "the number of non zero pixel : " << Number_non_zero_pixel << std::endl;
+		std::cout << "the mean value : " << meani << std::endl;
 
 		for (int i = 0; i < nx; i++)
 		{
@@ -210,7 +214,12 @@ namespace roadmarking
 
 		stdi /= Number_non_zero_pixel;
 		stdi = sqrt(stdi);
+		std::cout << "============stdi = sqrt(stdi);===============" << std::endl;
+		std::cout << stdi << std::endl;
 		maxi = meani + times_std * stdi; 
+		std::cout << " The maximum intensity value of the frame is "
+				  << maxi
+				  << std::endl;
 		for (int i = 0; i < nx; i++)
 		{
 			for (int j = 0; j < ny; j++)
@@ -220,6 +229,7 @@ namespace roadmarking
 				img.at<uchar>(i, j) = 255 * ave[i][j] / maxi ;
 			}
 		}
+		// visualizeIntensityHistogram(img);
 	}
 
 	void Imageprocess::pc2imgZ(const pcXYZIPtr &cloud, int whatcloud, Mat &img)
@@ -554,7 +564,7 @@ namespace roadmarking
 		const int histSize[1] = {256};
 		float pranges[2] = {0, 256};
 		const float *ranges[1] = {pranges};
-		MatND hist;
+		MatND hist; // No difference to the normal Mat constructor and is about to be absolote
 		calcHist(&inputImage, 1, channels, Mat(), hist, 1, histSize, ranges);
 		float maxentropy = 0;
 		int max_index = 0;
@@ -1090,7 +1100,31 @@ namespace roadmarking
 			}
 		}
 
-		//imshow("imgfill", 255 * img_fill);
+		// imshow("imgfill", 255 * img_fill);
+		// waitKey();
+		// intensityLineSegmentDetector(255 * img_fill);
+	}
+
+	void Imageprocess::ImgFilling(const Mat &img, Mat &img_fill, HoughConfig HC)
+	{
+		img.convertTo(img_fill, CV_8UC1);
+
+		Mat img_reverse, img_reverse_label;
+		//threshold(img, img_reverse, 1, 1, CV_THRESH_BINARY);
+		ImgReverse(img, img_reverse);
+		CcaBySeedFill(img_reverse, img_reverse_label);
+
+		for (int i = 1; i < img.rows - 1; i++)
+		{
+			for (int j = 1; j < img.cols - 1; j++)
+			{
+				if (img_reverse_label.at<int>(i, j) == 2)
+					img_reverse.at<uchar>(i, j) = 0;
+				img_fill.at<uchar>(i, j) = img.at<uchar>(i, j) + img_reverse.at<uchar>(i, j);
+			}
+		}
+
+		intensityHoughLineDetector(255 * img_fill,HC);
 	}
 
 	void Imageprocess::DetectCornerShiTomasi(const Mat &src, const Mat &colorlabel, Mat &cornerwithimg, int minDistance, double qualityLevel)
@@ -1238,6 +1272,214 @@ namespace roadmarking
 		imwrite("6_RoadMarkings.jpg", Label);
 
 		//cout << "Image Output Done." << endl;
+	}
+
+	void Imageprocess::visualizeIntensityHistogram(const Mat &imgI){
+		const int channels[1] = {0};
+		const int histSize[1] = {255};
+		float pranges[2] = {1, 256};
+		const float *ranges[1] = {pranges};
+		Mat hist;
+		int WIDTH = 400, HEIGHT = 400;
+		int bin_w = cvRound( (double) WIDTH/histSize[0]);
+		Mat histImage( HEIGHT, WIDTH, CV_8UC1, Scalar(0)), imgI_down;
+
+		calcHist( &imgI, 1, 0, Mat(), hist, 1, histSize, ranges);
+		normalize(hist, hist, 0, imgI.rows, NORM_MINMAX, -1, Mat() );
+		for( int i = 1; i < histSize[0]; i++ )
+    	{
+        line( histImage, Point( bin_w*(i-1), HEIGHT - cvRound(hist.at<float>(i-1)) ),
+              Point( bin_w*(i), HEIGHT - cvRound(hist.at<float>(i)) ),
+              Scalar(255), 2, 8, 0  );
+   		}
+		
+		// Resize the image so we would be able to visualize it
+		resize(imgI, imgI_down, Size(WIDTH, HEIGHT), INTER_LINEAR);
+
+		cv::imshow("Source image", imgI_down);
+		imshow("calcHist Demo", histImage );
+		waitKey();
+	}
+	void Imageprocess::intensityLineSegmentDetector(const Mat & imgI){
+
+    bool useRefine = true;
+    bool useCanny = false;
+    bool overlay = false;
+
+    if (useCanny)
+    {
+        Canny(imgI, imgI, 50, 200, 3); // Apply Canny edge detector
+    }
+
+    // Create and LSD detector with standard or no refinement.
+    Ptr<LineSegmentDetector> ls = useRefine ? createLineSegmentDetector(LSD_REFINE_ADV) : createLineSegmentDetector(LSD_REFINE_NONE);
+
+    double start = double(getTickCount());
+    vector<Vec4f> lines_std;
+	vector<float> width_lines, prec_lines, nfa;
+	Mat imgI_down;
+
+	imgI.convertTo(imgI_down, CV_8UC1);
+
+    // Detect the lines
+    ls->detect(imgI_down, lines_std, width_lines, prec_lines, nfa);
+
+    double duration_ms = (double(getTickCount()) - start) * 1000 / getTickFrequency();
+    std::cout << "It took " << duration_ms << " ms." << std::endl;
+
+	for (int i = 0; i < lines_std.size(); i++)
+	{
+		if (width_lines[i] < 5)
+		{
+			lines_std.erase(lines_std.begin()+i);
+			width_lines.erase(width_lines.begin()+i);
+			i--;
+		}
+	}
+
+    // Show found lines
+    if (!overlay || useCanny)
+    {
+        imgI_down = Scalar(0);
+    }
+
+    ls->drawSegments(imgI_down, lines_std);
+
+    String window_name = useRefine ? "Result - standard refinement" : "Result - no refinement";
+    window_name += useCanny ? " - Canny edge detector used" : "";
+	
+	imwrite("LSD_Intensity_Image.jpg", imgI_down);
+
+	}
+
+	void Imageprocess::intensityHoughLineDetector(const Mat & imgI, HoughConfig HC){
+
+		Mat dst, cdst;
+		vector<Vec2f> lines, filtered_lines; // will hold the results of the detection
+		float trajectory_ang_rad = HC.trajectory_ang_rad;
+		float fuse_thres = HC.fuse_thres;
+		float fuse_factor = HC.fuse_factor;
+		double rho_res = HC.rho_res;
+		double theta_res = HC.theta_res;
+		double decimal_tol = pow(10.0,HC.decimal_tol);
+
+		int vote_thres = HC.vote_thres;
+
+		// Edge detection
+		Canny(imgI, dst, 50, 200, 3);
+
+		cdst = Mat::zeros(imgI.size(), CV_8UC1);
+
+		// Standard Hough Line Transform
+		HoughLines(dst, lines, rho_res, theta_res * CV_PI/180, vote_thres, 0, 0 ); // runs the actual detection
+
+		visualizeHoughResults(imgI, "after_hough_detect", lines);
+
+		// Getting the most dominant theta 
+		map<float,vector<Vec2f>> parallel_dict;
+
+		// Filtering according to the trajectory direction
+			// for( size_t i = 0; i < lines.size(); i++ )
+			// {
+			// 	if(abs(lines[i][1] - trajectory_ang_rad) < 0.09)
+			// 		{
+			// 			filtered_lines.push_back(lines[i]);
+			// 		}
+			// }
+
+
+
+		// Searching for the maximum of parallal lines
+		for( size_t i = 0; i < lines.size(); i++)
+		{
+			float theta_group = round(lines[i][1] * decimal_tol) / decimal_tol;
+			cout << " THETA GROUP: " << theta_group << endl;
+			parallel_dict[theta_group].push_back(lines[i]);
+		}
+
+		map<float,vector<Vec2f>>::iterator it;
+		filtered_lines.clear(); // Store only the most dominent theta group (the angle that has the maximum number of parallal lines)
+		auto max_parallal = parallel_dict.begin()->second.size();
+		float dominantTheta = parallel_dict.begin()->first;
+
+		for (it = parallel_dict.begin(); it != parallel_dict.end(); it++)
+		{
+			if (it->second.size() > max_parallal)
+			{
+				max_parallal = it->second.size();
+				dominantTheta = it->first;
+				cout << "Group # " << max_parallal << " ,theta # " << dominantTheta << endl;
+			}
+		}
+		filtered_lines = parallel_dict[dominantTheta];
+		
+		visualizeHoughResults(imgI, "after_parallel_filtering", filtered_lines);
+
+		// Fusing close lines
+		for( size_t i = 0; i < filtered_lines.size()-1; i++)
+		{
+			for(size_t j = i+1; j < filtered_lines.size(); j++)
+			{
+				float fused_off = sqrt((filtered_lines[i][0] - filtered_lines[j][0]) * (filtered_lines[i][0] - filtered_lines[j][0]));
+				
+				if(fused_off <= fuse_thres)
+				{
+					float fused_rho = filtered_lines[i][0] * fuse_factor + filtered_lines[j][0] * (1 - fuse_factor);
+					float fused_theta = filtered_lines[i][1] * fuse_factor + filtered_lines[j][1] * (1 - fuse_factor);
+					Vec2f fused_line = {fused_rho, fused_theta};
+					filtered_lines.erase(filtered_lines.begin()+j);
+					filtered_lines.erase(filtered_lines.begin()+i);
+					filtered_lines.push_back(fused_line);
+					i--;
+					break;
+				}
+
+			}
+		}
+
+		visualizeHoughResults(imgI, "after_line_fusing", filtered_lines);
+	}
+
+	void Imageprocess::visualizeHoughResults(const Mat &img, const string & condition, const vector<Vec2f> & lines){
+		
+		Mat cdst;
+
+		// Get an extreme boundry of the image to guarantee that lines will cut the end
+		int max_dim = 2*max(img.rows,img.cols); 
+
+		// Copy edges to the images that will display the results in BGR
+		cvtColor(img, cdst, COLOR_GRAY2BGR);
+
+		//Print the filtered lines
+		std::cout << "Number  of lines " + condition + " : " << lines.size() << std::endl;
+		for( size_t i = 0; i < lines.size(); i++)
+		{
+			cout << "Line # " << i << " : " << lines[i] << endl;
+			float rho = lines[i][0], theta = lines[i][1];
+			Point pt1, pt2;
+			double a = cos(theta), b = sin(theta);
+			double x0 = a*rho, y0 = b*rho;
+			pt1.x = cvRound(x0 + max_dim*(-b));
+			pt1.y = cvRound(y0 + max_dim*(a));
+			pt2.x = cvRound(x0 - max_dim*(-b));
+			pt2.y = cvRound(y0 - max_dim*(a));
+			// cout << "Points: " << pt1 << " , " <<  pt2 << endl;
+			line( cdst, pt1, pt2, Scalar(0,0,255), 3, LINE_AA);
+
+			cout << "==============================" << endl;
+			// Get all pixel indices of line points intersecting an image boundries
+			LineIterator lineIt(img, pt1, pt2);
+			// Get extreme points of the lines
+			cout << "The first point clipping the image: " << lineIt.pos() << endl;
+			size_t j = 0;
+			while(j < lineIt.count){
+				j++;
+				lineIt++;
+			}
+			cout << "The last point clipping the image: " << lineIt.pos() << endl;
+
+		}
+		imwrite("Hough_transform_img_" + condition + ".jpg",cdst);
 	}
 
 }

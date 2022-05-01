@@ -56,6 +56,16 @@ namespace roadmarking
 
 		infile >> paralist.sideline_vector_distance;
 		infile >> paralist.visualization_on;
+		
+
+		//Hough params
+		infile >> paralist.HC.trajectory_ang_rad;
+		infile >> paralist.HC.fuse_thres;
+		infile >> paralist.HC.fuse_factor;
+		infile >> paralist.HC.rho_res;
+		infile >> paralist.HC.theta_res;
+		infile >> paralist.HC.decimal_tol;
+		infile >> paralist.HC.vote_thres;
 	}
 
 	void DataIo::displayparameter(int datatype, int roadtype, int is_road_extracted)
@@ -372,10 +382,31 @@ namespace roadmarking
 			PCL_ERROR("Couldn't read file\n");
 			return false;
 		}
+
+		std::cout << "Loaded Points Before filtering: "
+                << pointCloud->points.size()
+                << std::endl;
+
+		// Remove data points away from 5 meter range and amplifying the intensity values of the point cloud
+		for(int i = 0; i < pointCloud->points.size(); i++){
+			// if(abs(pointCloud->points[i].y) > 5){
+			// //  ||pointCloud->points[i].intensity < 0.3){
+			// 	pointCloud->points[i].intensity  = 0;
+			// }
+			// else
+				// Amplify the intensity value the point cloud
+			// pointCloud->points[i].intensity *= 100.0;
+		}
+		std::cout << "Loaded Points After filtering: "
+                << pointCloud->points.size()
+                << std::endl;
 		if (pointCloud->points[0].intensity==0) //check if the intensity exsit
 			printf("Warning! Point cloud intensity may not be imported properly, check the scalar field's name.\n");
 		getCloudBound(pointCloud, bound_3d);
-		for (int i=0; i<pointCloud->size(); i++) //shift the center point to the origin of the coordinate system
+		
+
+		//shift the center point to the origin of the coordinate system
+		for (int i=0; i<pointCloud->size(); i++) 
 	    {
 			pointCloud->points[i].x -= (0.5*(bound_3d.min_x+bound_3d.max_x));
 			pointCloud->points[i].y -= (0.5*(bound_3d.min_y+bound_3d.max_y));
@@ -653,6 +684,7 @@ namespace roadmarking
 				//cout << "Warning: the" << i << "th point cloud contain point less than the threshold. Do not save it." << endl;
 				continue;
 			}
+			std::cout << "The name of the saved file is : " << outputFileName << std::endl;
 			writePcdFile(outputFileName, pointClouds[i].makeShared());
 		}
 
@@ -749,7 +781,7 @@ namespace roadmarking
 		}
 	}
 
-	void DataIo::displayRoadwithIntensities(const pcXYZIPtr &road_cloud, const float &intensity_limit, const float &elevation_limit)
+	void DataIo::displayRoadwithIntensities(const pcXYZIPtr &road_cloud, const float &intensity_limit, const float &elevation_limit, const float &y_range, const string &filename)
 	{
 		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Filtered Road Point Cloud With Intensities"));
 		pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointXYZI> point_cloud_color_handler(road_cloud, "intensity");
@@ -758,53 +790,86 @@ namespace roadmarking
 		char t[256];
 		string s;
 		int n = 0;
-		float maxi, maxvi, mini, max_z, min_z;
+		float maxi, maxvi, mini, max_z, min_z, max_x, min_x, max_y, min_y;
 
 		maxi = -FLT_MAX;
 		mini = FLT_MAX;
 		max_z = -FLT_MAX;
 		min_z = FLT_MAX;
+		max_x = -FLT_MAX;
+		min_x = FLT_MAX;
+		max_y = -FLT_MAX;
+		min_y = FLT_MAX;
 
 		pcXYZIPtr RC(new pcXYZI());
 
 		for (size_t i = 0; i < road_cloud->points.size(); ++i)
 		{
+			//Intensity
 			if (road_cloud->points[i].intensity > maxi)
 				maxi = road_cloud->points[i].intensity;
 			if (road_cloud->points[i].intensity < mini)
 				mini = road_cloud->points[i].intensity;
 		}
-
+		
 		// Ground points are rendered in intensity
 		for (size_t i = 0; i < road_cloud->points.size(); ++i)
 		{
-			// filter points with relatively high threshold (0.4) with elevation below 0
-			if(road_cloud->points[i].intensity >= intensity_limit && road_cloud->points[i].z <= elevation_limit){
-				RC->points.push_back(road_cloud->points[i]);
-				// Show .PCD information
-				// std::cout << "    " << road_cloud->points[i].x
-				// << " "    << road_cloud->points[i].y
-				// << " "    << road_cloud->points[i].z
-				// << " "    << road_cloud->points[i].intensity
-				// << std::endl;
-			}
-			
+			// filter to points with relatively high threshold with elevation below (0), Only points within car range (10 meter range in the Y direction)
+			if(road_cloud->points[i].intensity >= intensity_limit && road_cloud->points[i].z <= elevation_limit && abs(road_cloud->points[i].y) <= y_range){
+			//X
+			if (road_cloud->points[i].x > max_x)
+				max_x = road_cloud->points[i].x;
+			if (road_cloud->points[i].x < min_x)
+				min_x = road_cloud->points[i].x;
+			//Y
+			if (road_cloud->points[i].y > max_y)
+				max_y = road_cloud->points[i].y;
+			if (road_cloud->points[i].y < min_y)
+				min_y = road_cloud->points[i].y;
+			//Z
+			if (road_cloud->points[i].z > max_z)
+				max_z = road_cloud->points[i].z;
+			if (road_cloud->points[i].z < min_z)
+				min_z = road_cloud->points[i].z;
+
+			RC->points.push_back(road_cloud->points[i]);
+
+		}
 		}
 
-		std::cout << "Loaded Points after filtering"
+		std::cout << "# of Points after filtering"
             << " "
 			<< RC->points.size()
             << std::endl;
 
-		viewer->addPointCloud< pcl::PointXYZI >(RC, point_cloud_color_handler, "Ground");
-		viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "Ground");
+		std::cout << "The maximum values of X, Y, Z and Intensity: "
+					<< " " << max_x
+					<< " " << max_y
+					<< " " << max_z
+					<< " " << maxi
+					<< std::endl;
+		std::cout << "The minimum values of X, Y, Z and Intensity: "
+					<< " " << min_x
+					<< " " << min_y
+					<< " " << min_z
+					<< " " << mini
+					<< std::endl;
 
-		cout << "Click X(close) to continue..." << endl;
-		while (!viewer->wasStopped())
-		{
-			viewer->spinOnce(100);
-			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
-		}
+		// Point saving into binary results in wrong visualization using QTKITTIvisualizer
+		// string outputFileName = "./out" + filename.substr(0,filename.find('.')) + ".bin";
+		// std::cout << "The name of the saved file is : " << outputFileName << std::endl;
+		// writePcdFile(outputFileName, RC);
+
+		// viewer->addPointCloud< pcl::PointXYZI >(RC, point_cloud_color_handler, "Ground");
+		// viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "Ground");
+		// viewer->addCoordinateSystem(2.0);
+		// cout << "Click X(close) to continue..." << endl;
+		// while (!viewer->wasStopped())
+		// {
+		// 	viewer->spinOnce(100);
+		// 	boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+		// }
 	}
 	void DataIo::displayGroundwithIntensities(const pcXYZIPtr &gcloud, const float &intensity_limit, const float &elevation_limit)
 	{

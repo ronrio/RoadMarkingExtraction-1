@@ -92,12 +92,15 @@ int main(int argc, char *argv[])
     vector<double> CloudBoundingBox; // Xmin,Ymin,Zmin,Xmax,Ymax,Zmax after translation for Input point cloud;
     Bounds bound_3d_temp;
     double X_origin =0.0, Y_origin=0.0; // X,Y origin before translation;
+    
     //Step 2,3
     pcXYZIPtr fcloud(new pcXYZI());  // Sampled point cloud
     pcXYZIPtr ngcloud(new pcXYZI()); // Non-ground point cloud
     pcXYZIPtr gcloud(new pcXYZI());  // Ground point cloud
+    
     //Step 4
     Mat imgI, imgZ, imgD; // imgI:Intensity Projection Image; imgZ: Elevation Projection Image ; imgD: Density Projection Image
+    
     //Step 5
     Mat imgImf, imgIgradient, imgIgradientroad, imgIbinary, imgZgradient, imgZbinary, imgDbinary, imgIbfilter, labelImg, colorLabelImg, imgFilled, Timg, dilateImg, closeImg, corner, cornerwithimg;
     /* imgImf: Intensity Projection Image after Median Filter ;
@@ -134,10 +137,10 @@ int main(int argc, char *argv[])
     else if (!strcmp(extension.c_str(), "pcd"))
         {
             io.readPcdFile(inputFilePath, cloud, bound_3d_temp);
-            std::cout << "Loaded Points after file reading: "
-                << cloud->points.size()
-                << std::endl;
-            io.displayRoadwithIntensities(cloud, 0.7, 0);                           //  Display Road Point Cloud with their respective intensities
+            std::cout << "The name of the loaded file is : "
+                    << filename
+                    << std::endl;
+            // io.displayRoadwithIntensities(cloud, 0, 0, 3, filename);                           //  Display Road Point Cloud with their respective intensities
         }
     else 
         printf("Unrecognized data format. Please use *.pcd or *.las format point cloud.\n");
@@ -242,13 +245,13 @@ int main(int argc, char *argv[])
         smallregion = 0.4 / (resolution * resolution); //Pixel Number Threshold: 0.6 m^2 as the threshold for small connected region. Manually tune parameter (0.5) here.
     else if (datatype == 2)
         smallregion = 0.5 / (resolution * resolution);
-    ip.RemoveSmallRegion(imgIbinary, imgIbfilter, smallregion); //CCA Filtering (Problem: It's inefficient to run CCA twice. Improve the codes latter.)
+    ip.RemoveSmallRegion(imgIbinary, imgIbfilter, smallregion); //CCA Filtering (Problem: It's inefficient to run CCA twice. Improve the codes later.)
 
     // filling the hole
     Timg = imgIbfilter;
     // Timg = imgIbinary;
     //ip.Truncate(imgIbfilter, Timg); //may encounter some problem (OpenCV Error: Assertion failed)
-    ip.ImgFilling(Timg, imgFilled); //Filling the holes inside the markings (Optional)
+    ip.ImgFilling(Timg, imgFilled, io.paralist.HC); //Filling the holes inside the markings (Optional)
 
     //5.3.2. Morphological Operations: Dilation and Closing (Optional)
     /*Mat element = getStructuringElement(MORPH_CROSS, Size(3, 3));
@@ -360,12 +363,12 @@ int main(int argc, char *argv[])
     //Display Results
     if (io.paralist.visualization_on)
     {
-        // io.displayroad(ngcloud, gcloud);                                              //Display non-ground and ground cloud
+        io.displayroad(ngcloud, gcloud);                                              //Display non-ground and ground cloud
         // io.displaymarkwithng(outcloud_otsu_sor_n, ngcloud);          //Display road markings point clouds with non-ground cloud
         // io.displaymarkbycategory(outcloud_otsu_sor_n, roadmarkings); //Display road markings point clouds rendered by category
         //io.displaymarkVect(roadmarkings, sideline_roadmarkings);                        //Display vectorized road markings
-        io.displayGroundwithIntensities(gcloud, 0.5, 0);                        // Display Ground Point Cloud with their respective intensities    
+        io.displayGroundwithIntensities(gcloud, 0.3, 0);                        // Display Ground Point Cloud with their respective intensities    
     }
-
+    
     return 1;
 }
