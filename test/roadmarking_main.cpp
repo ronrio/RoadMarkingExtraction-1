@@ -247,17 +247,17 @@ int main(int argc, char *argv[])
         smallregion = 0.5 / (resolution * resolution);
     ip.RemoveSmallRegion(imgIbinary, imgIbfilter, smallregion); //CCA Filtering (Problem: It's inefficient to run CCA twice. Improve the codes later.)
 
+    //5.3.2. Morphological Operations: Dilation and Closing (Optional)
+    Mat element = getStructuringElement(MORPH_RECT, Size(3, 3));
+    morphologyEx(imgIbfilter, closeImg, MORPH_CLOSE, element);
+		//dilate(imgIbfilter, dilateImg, Mat(),element);
+		//erode(dilateImg, closeImg, Mat());  // ->closeImg
+
     // filling the hole
-    Timg = imgIbfilter;
+    Timg = closeImg;
     // Timg = imgIbinary;
     //ip.Truncate(imgIbfilter, Timg); //may encounter some problem (OpenCV Error: Assertion failed)
     ip.ImgFilling(Timg, imgFilled, io.paralist.HC); //Filling the holes inside the markings (Optional)
-
-    //5.3.2. Morphological Operations: Dilation and Closing (Optional)
-    /*Mat element = getStructuringElement(MORPH_CROSS, Size(3, 3));
-		morphologyEx(imgIbfilter, closeImg, MORPH_CLOSE, element);
-		//dilate(imgIbfilter, dilateImg, Mat(),element);
-		//erode(dilateImg, closeImg, Mat());  // ->closeImg*/
 
     // Image 11
     //ip.CcaBySeedFill(Timg, labelImg);

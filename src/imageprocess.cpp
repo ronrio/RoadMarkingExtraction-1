@@ -1124,7 +1124,7 @@ namespace roadmarking
 			}
 		}
 
-		intensityHoughLineDetector(255 * img_fill,HC);
+		img_fill = intensityHoughLineDetector(255 * img_fill,HC) / 255;
 	}
 
 	void Imageprocess::DetectCornerShiTomasi(const Mat &src, const Mat &colorlabel, Mat &cornerwithimg, int minDistance, double qualityLevel)
@@ -1352,9 +1352,9 @@ namespace roadmarking
 
 	}
 
-	void Imageprocess::intensityHoughLineDetector(const Mat & imgI, HoughConfig HC){
+	Mat Imageprocess::intensityHoughLineDetector(const Mat & imgI, HoughConfig HC){
 
-		Mat dst, cdst;
+		Mat dst;
 		vector<Vec2f> lines, filtered_lines; // will hold the results of the detection
 		float trajectory_ang_rad = HC.trajectory_ang_rad;
 		float fuse_thres = HC.fuse_thres;
@@ -1368,12 +1368,10 @@ namespace roadmarking
 		// Edge detection
 		Canny(imgI, dst, 50, 200, 3);
 
-		cdst = Mat::zeros(imgI.size(), CV_8UC1);
-
 		// Standard Hough Line Transform
 		HoughLines(dst, lines, rho_res, theta_res * CV_PI/180, vote_thres, 0, 0 ); // runs the actual detection
 
-		visualizeHoughResults(imgI, "after_hough_detect", lines);
+		visualizeHoughResults(imgI, "after_hough_detect", lines, HC.marking_width);
 
 		// Getting the most dominant theta 
 		map<float,vector<Vec2f>> parallel_dict;
@@ -1413,7 +1411,7 @@ namespace roadmarking
 		}
 		filtered_lines = parallel_dict[dominantTheta];
 		
-		visualizeHoughResults(imgI, "after_parallel_filtering", filtered_lines);
+		visualizeHoughResults(imgI, "after_parallel_filtering", filtered_lines, HC.marking_width);
 
 		// Fusing close lines
 		for( size_t i = 0; i < filtered_lines.size()-1; i++)
@@ -1437,10 +1435,11 @@ namespace roadmarking
 			}
 		}
 
-		visualizeHoughResults(imgI, "after_line_fusing", filtered_lines);
+		visualizeHoughResults(imgI, "after_line_fusing", filtered_lines, HC.marking_width);
+		return generateHoughMask(imgI, filtered_lines, HC.marking_width);
 	}
 
-	void Imageprocess::visualizeHoughResults(const Mat &img, const string & condition, const vector<Vec2f> & lines){
+	void Imageprocess::visualizeHoughResults(const Mat &img, const string & condition, const vector<Vec2f> & lines, int marking_width){
 		
 		Mat cdst;
 
@@ -1464,7 +1463,7 @@ namespace roadmarking
 			pt2.x = cvRound(x0 - max_dim*(-b));
 			pt2.y = cvRound(y0 - max_dim*(a));
 			// cout << "Points: " << pt1 << " , " <<  pt2 << endl;
-			line( cdst, pt1, pt2, Scalar(0,0,255), 3, LINE_AA);
+			line( cdst, pt1, pt2, Scalar(0,0,255), marking_width, LINE_AA);
 
 			cout << "==============================" << endl;
 			// Get all pixel indices of line points intersecting an image boundries
@@ -1480,6 +1479,42 @@ namespace roadmarking
 
 		}
 		imwrite("Hough_transform_img_" + condition + ".jpg",cdst);
+	}
+
+	Mat Imageprocess::generateHoughMask(const Mat &img, const vector<Vec2f> & lines, int marking_width){
+		
+		Mat cdst = Mat::zeros(img.size(), CV_8UC1), seg_Mat;
+
+		// Get an extreme boundry of the image to guarantee that lines will cut the end
+		int max_dim = 2*max(img.rows,img.cols); 
+
+		for( size_t i = 0; i < lines.size(); i++)
+		{
+			float rho = lines[i][0], theta = lines[i][1];
+			Point pt1, pt2;
+			double a = cos(theta), b = sin(theta);
+			double x0 = a*rho, y0 = b*rho;
+			pt1.x = cvRound(x0 + max_dim*(-b));
+			pt1.y = cvRound(y0 + max_dim*(a));
+			pt2.x = cvRound(x0 - max_dim*(-b));
+			pt2.y = cvRound(y0 - max_dim*(a));
+
+			line( cdst, pt1, pt2, Scalar(255), marking_width, LINE_AA);
+
+			cout << "===============Line Endpoint Indices===============" << endl;
+			// Get all pixel indices of line points intersecting an image boundries
+			LineIterator lineIt(img, pt1, pt2);
+			// Get extreme points of the lines
+			cout << "The first point clipping the image: " << lineIt.pos() << endl;
+			size_t j = 0;
+			while(j < lineIt.count){
+				j++;
+				lineIt++;
+			}
+			cout << "The last point clipping the image: " << lineIt.pos() << endl;
+		}
+		cv::bitwise_and(img, cdst, seg_Mat);
+		return seg_Mat;
 	}
 
 }

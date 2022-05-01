@@ -66,6 +66,7 @@ namespace roadmarking
 		infile >> paralist.HC.theta_res;
 		infile >> paralist.HC.decimal_tol;
 		infile >> paralist.HC.vote_thres;
+		infile >> paralist.HC.marking_width;
 	}
 
 	void DataIo::displayparameter(int datatype, int roadtype, int is_road_extracted)
