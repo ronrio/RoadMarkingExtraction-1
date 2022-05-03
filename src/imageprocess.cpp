@@ -1124,7 +1124,7 @@ namespace roadmarking
 			}
 		}
 
-		img_fill = intensityHoughLineDetector(255 * img_fill,HC) / 255;
+		// img_fill = intensityHoughLineDetector(255 * img_fill,HC) / 255;
 	}
 
 	void Imageprocess::DetectCornerShiTomasi(const Mat &src, const Mat &colorlabel, Mat &cornerwithimg, int minDistance, double qualityLevel)
