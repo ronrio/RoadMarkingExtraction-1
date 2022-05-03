@@ -817,7 +817,7 @@ namespace roadmarking
 		for (size_t i = 0; i < road_cloud->points.size(); ++i)
 		{
 			// filter to points with relatively high threshold with elevation below (0), Only points within car range (10 meter range in the Y direction)
-			if(road_cloud->points[i].intensity >= intensity_limit && road_cloud->points[i].z <= elevation_limit && abs(road_cloud->points[i].y) <= y_range){
+			// if(road_cloud->points[i].intensity >= intensity_limit && road_cloud->points[i].z <= elevation_limit && abs(road_cloud->points[i].y) <= y_range){
 			//X
 			if (road_cloud->points[i].x > max_x)
 				max_x = road_cloud->points[i].x;
@@ -836,7 +836,7 @@ namespace roadmarking
 
 			RC->points.push_back(road_cloud->points[i]);
 
-		}
+		// }
 		}
 
 		std::cout << "# of Points after filtering"
@@ -862,15 +862,15 @@ namespace roadmarking
 		// std::cout << "The name of the saved file is : " << outputFileName << std::endl;
 		// writePcdFile(outputFileName, RC);
 
-		// viewer->addPointCloud< pcl::PointXYZI >(RC, point_cloud_color_handler, "Ground");
-		// viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "Ground");
-		// viewer->addCoordinateSystem(2.0);
-		// cout << "Click X(close) to continue..." << endl;
-		// while (!viewer->wasStopped())
-		// {
-		// 	viewer->spinOnce(100);
-		// 	boost::this_thread::sleep(boost::posix_time::microseconds(100000));
-		// }
+		viewer->addPointCloud< pcl::PointXYZI >(RC, point_cloud_color_handler, "Ground");
+		viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "Ground");
+		viewer->addCoordinateSystem(2.0);
+		cout << "Click X(close) to continue..." << endl;
+		while (!viewer->wasStopped())
+		{
+			viewer->spinOnce(100);
+			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+		}
 	}
 	void DataIo::displayGroundwithIntensities(const pcXYZIPtr &gcloud, const float &intensity_limit, const float &elevation_limit)
 	{

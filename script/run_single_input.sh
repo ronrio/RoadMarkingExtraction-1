@@ -1,4 +1,5 @@
 single_file=./hope.pcd
+#./sample_data/aggreg_from_30.pcd
 
 # road_type=highway
 road_type=urban

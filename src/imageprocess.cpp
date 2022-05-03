@@ -1414,24 +1414,26 @@ namespace roadmarking
 		visualizeHoughResults(imgI, "after_parallel_filtering", filtered_lines, HC.marking_width);
 
 		// Fusing close lines
-		for( size_t i = 0; i < filtered_lines.size()-1; i++)
-		{
-			for(size_t j = i+1; j < filtered_lines.size(); j++)
+		if (filtered_lines.size() > 0){
+			for( size_t i = 0; i < filtered_lines.size()-1; i++)
 			{
-				float fused_off = sqrt((filtered_lines[i][0] - filtered_lines[j][0]) * (filtered_lines[i][0] - filtered_lines[j][0]));
-				
-				if(fused_off <= fuse_thres)
+				for(size_t j = i+1; j < filtered_lines.size(); j++)
 				{
-					float fused_rho = filtered_lines[i][0] * fuse_factor + filtered_lines[j][0] * (1 - fuse_factor);
-					float fused_theta = filtered_lines[i][1] * fuse_factor + filtered_lines[j][1] * (1 - fuse_factor);
-					Vec2f fused_line = {fused_rho, fused_theta};
-					filtered_lines.erase(filtered_lines.begin()+j);
-					filtered_lines.erase(filtered_lines.begin()+i);
-					filtered_lines.push_back(fused_line);
-					i--;
-					break;
-				}
+					float fused_off = sqrt((filtered_lines[i][0] - filtered_lines[j][0]) * (filtered_lines[i][0] - filtered_lines[j][0]));
+					
+					if(fused_off <= fuse_thres)
+					{
+						float fused_rho = filtered_lines[i][0] * fuse_factor + filtered_lines[j][0] * (1 - fuse_factor);
+						float fused_theta = filtered_lines[i][1] * fuse_factor + filtered_lines[j][1] * (1 - fuse_factor);
+						Vec2f fused_line = {fused_rho, fused_theta};
+						filtered_lines.erase(filtered_lines.begin()+j);
+						filtered_lines.erase(filtered_lines.begin()+i);
+						filtered_lines.push_back(fused_line);
+						i--;
+						break;
+					}
 
+				}
 			}
 		}
 
@@ -1487,7 +1489,6 @@ namespace roadmarking
 
 		// Get an extreme boundry of the image to guarantee that lines will cut the end
 		int max_dim = 2*max(img.rows,img.cols); 
-
 		for( size_t i = 0; i < lines.size(); i++)
 		{
 			float rho = lines[i][0], theta = lines[i][1];
@@ -1514,7 +1515,29 @@ namespace roadmarking
 			cout << "The last point clipping the image: " << lineIt.pos() << endl;
 		}
 		cv::bitwise_and(img, cdst, seg_Mat);
+		// testPolyFit(img);
 		return seg_Mat;
 	}
 
+	void Imageprocess::testPolyFit(const Mat & img){
+		Mat cdst(Size(img.rows,img.cols), CV_8UC3, Scalar(0,0,0));
+
+		vector<Point> poi = {{20,0}, {100,15}, {250,30}, {500,100}, {1000,1000}}; //Don't define points like this, it is confusing !!
+		size_t n = 5;
+		double erry[5] = {0.0};
+		for(size_t i = 0; i < poi.size(); i++)
+		{
+			circle(cdst, poi[i], 50, Scalar(255,255,255), 8,0);
+		}
+		// const double x[4] = {0, 15, 30, 100};
+		// double y[4] = {20, 100, 250, 500};
+		// const size_t n = 4, k = 2, x_range = img.rows;
+		for(size_t i=0; i < poi.size(); i++){
+			cout << "Display point: " << poi[i] << endl;
+		}
+		vector<Point> out = polyfit::PolyFitCV(poi, erry, 2, std::pair<size_t,size_t>(img.rows, img.cols));
+		polylines(cdst, out, false, Scalar(0,255,0), 3);
+		resize(cdst, cdst, Size(), 0.5, 0.5, INTER_LINEAR);
+		imwrite("poly_line_img.jpg",cdst);
+	}
 }

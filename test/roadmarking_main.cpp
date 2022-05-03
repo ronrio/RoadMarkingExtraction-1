@@ -4,7 +4,6 @@
 #include "pointcloudprocess.h"
 #include "imageprocess.h"
 #include "modelmatch.h"
-
 #include <chrono>
 
 using namespace std;
@@ -140,7 +139,7 @@ int main(int argc, char *argv[])
             std::cout << "The name of the loaded file is : "
                     << filename
                     << std::endl;
-            // io.displayRoadwithIntensities(cloud, 0, 0, 3, filename);                           //  Display Road Point Cloud with their respective intensities
+            // io.displayRoadwithIntensities(cloud, 0.5, 0, 20, filename);                           //  Display Road Point Cloud with their respective intensities
         }
     else 
         printf("Unrecognized data format. Please use *.pcd or *.las format point cloud.\n");
