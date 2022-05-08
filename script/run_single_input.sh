@@ -1,4 +1,6 @@
-single_file=./sample_data/Toronto_samp_2_Habeeebi.pcd
+single_file=./hope.pcd
+
+# ./sample_data/Toronto_samp_2_Habeeebi.pcd
 # ./hope.pcd
 #./sample_data/aggreg_from_30.pcd
 

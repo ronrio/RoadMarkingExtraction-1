@@ -21,6 +21,7 @@ int main(int argc, char *argv[])
     std::string outputFolderPath = argv[2];
     std::string model_path = "./model_pool/models_urban_example/";
     std::string parm_file = "./config/parameter_urban_example.txt";
+    std::string gt_file = "./sample_data/Toronto_samp_2_Habebi.txt";
 
     if (argc == 3)
         printf("Model pool path and configuration file are not specified, use the default model pool and parameters.\n");
@@ -70,6 +71,7 @@ int main(int argc, char *argv[])
     is_road_extracted = 0; //not extracted
 
     io.readParalist(parm_file);
+    io.readGroundTruth(gt_file);
 
     roadtype = io.paralist.road_type;
     float density = io.paralist.expected_point_num_per_m_square;
@@ -139,7 +141,7 @@ int main(int argc, char *argv[])
             std::cout << "The name of the loaded file is : "
                     << filename
                     << std::endl;
-            // io.displayRoadwithIntensities(cloud, 0.5, 0, 20, filename);                           //  Display Road Point Cloud with their respective intensities
+            // io.displayRoadwithIntensities(cloud, 0.5, 0, 20, filename);  //  Display Road Point Cloud with their respective intensities
         }
     else 
         printf("Unrecognized data format. Please use *.pcd or *.las format point cloud.\n");
@@ -195,6 +197,8 @@ int main(int argc, char *argv[])
     //[0:Original Cloud, 1 : Ground Cloud, 2 : Non - ground Cloud]
     // Image 1
     ip.pc2imgI(gcloud, 1, imgI, io.paralist.intensity_scale);
+    ip.applyPrespectiveTransform(imgI, bound_3d_temp);
+    
     // Image 2
     ip.pc2imgZ(ngcloud, 2, imgZ);
     // Image 3
@@ -205,7 +209,6 @@ int main(int argc, char *argv[])
         ip.pc2imgD(gcloud, 1, imgD, expectedmaxnum);
     }
     cout << "Point Cloud --> Geo-referneced Image done\n";
-
     //Step 5. Image Processing
     //5.1.1 Median filter  (Optional)
     // Image 4
@@ -367,6 +370,7 @@ int main(int argc, char *argv[])
         // io.displaymarkbycategory(outcloud_otsu_sor_n, roadmarkings); //Display road markings point clouds rendered by category
         //io.displaymarkVect(roadmarkings, sideline_roadmarkings);                        //Display vectorized road markings
         io.displayGroundwithIntensities(gcloud, 0.3, 0);                        // Display Ground Point Cloud with their respective intensities    
+
     }
     
     return 1;

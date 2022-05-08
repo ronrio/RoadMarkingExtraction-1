@@ -1124,7 +1124,7 @@ namespace roadmarking
 			}
 		}
 
-		// img_fill = intensityHoughLineDetector(255 * img_fill,HC) / 255;
+		img_fill = intensityHoughLineDetector(255 * img_fill,HC) / 255;
 	}
 
 	void Imageprocess::DetectCornerShiTomasi(const Mat &src, const Mat &colorlabel, Mat &cornerwithimg, int minDistance, double qualityLevel)
@@ -1519,6 +1519,7 @@ namespace roadmarking
 		return seg_Mat;
 	}
 
+	// Is the error proportional to significance of the y or not ?
 	void Imageprocess::testPolyFit(const Mat & img){
 		Mat cdst(Size(img.rows,img.cols), CV_8UC3, Scalar(0,0,0));
 
@@ -1539,5 +1540,66 @@ namespace roadmarking
 		polylines(cdst, out, false, Scalar(0,255,0), 3);
 		resize(cdst, cdst, Size(), 0.5, 0.5, INTER_LINEAR);
 		imwrite("poly_line_img.jpg",cdst);
+	}
+
+	void Imageprocess::applyPrespectiveTransform(const Mat &img, Bounds& bounds){
+	Mat img_tmp(img.size(), CV_8UC1), tansform_mat;
+	vector<Vec2f> src, dst;
+	Vec2f vertex_src, vertex_dst;
+
+	// Get the source boundry points
+	
+	// Up Left
+	vertex_src[0] = bounds.min_x;
+	vertex_src[1] = bounds.min_y;
+	src.push_back(vertex_src);
+	
+	//Up Right
+	vertex_src[0] = bounds.min_x;
+	vertex_src[1] = bounds.max_y;
+	src.push_back(vertex_src);
+
+	//Down Right
+	vertex_src[0] = bounds.max_x;
+	vertex_src[1] = bounds.max_y;
+	src.push_back(vertex_src);
+
+	//Down Left
+	vertex_src[0] = bounds.max_x;
+	vertex_src[1] = bounds.min_y;
+	src.push_back(vertex_src);
+
+	// Get the destination boundry points
+	
+	// Up Left
+	vertex_dst[0] = 0;
+	vertex_dst[1] = 0;
+	dst.push_back(vertex_dst);
+	
+	//Up Right
+	vertex_dst[0] = 0;
+	vertex_dst[1] = bounds.max_y;
+	dst.push_back(vertex_dst);
+
+	//Down Right
+	vertex_dst[0] = bounds.max_x;
+	vertex_dst[1] = bounds.max_y;
+	dst.push_back(vertex_dst);
+
+	//Down Left
+	vertex_dst[0] = bounds.max_x;
+	vertex_dst[1] = 0;
+	dst.push_back(vertex_dst);
+
+	// Compute the transformation matrix
+	tansform_mat = getPerspectiveTransform(src,dst);
+	warpPerspective(img, img_tmp, tansform_mat, img.size());
+
+	// Display the result
+	imshow("After Prespective Transformation", img_tmp);
+	// Display the result
+	imshow("Before Prespective Image", img);
+	waitKey(0);
+
 	}
 }

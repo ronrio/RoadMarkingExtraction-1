@@ -36,6 +36,25 @@ using namespace boost::filesystem;
 
 namespace roadmarking
 {
+	void DataIo::readGroundTruth(string groundTruthfile){
+		std::ifstream infile;
+		infile.open(groundTruthfile, ios::in);
+		if(!infile.is_open())
+			cout << "Failed to open the parameter file, use default parameters." << endl;
+		while (!infile.eof())
+		{
+			char val;
+			infile >> val;
+			groundTruth.groundTruthVals.push_back(val);
+		}
+		size_t gt_size = groundTruth.groundTruthVals.size();
+		cout << "Total number of labels loaded are : " << groundTruth.groundTruthVals.size() << endl;
+		cout << "The last outputed label : " << groundTruth.groundTruthVals[gt_size-1] << endl;
+		cout << "The one before the last outputed label : " << groundTruth.groundTruthVals[gt_size-3] << endl;
+		cout << "The first outputed label : " << groundTruth.groundTruthVals[0] << endl;
+		cout << "The second outputed label : " << groundTruth.groundTruthVals[1] << endl;
+	}
+
 	void DataIo::readParalist(string paralistfile)
 	{
 		std::ifstream infile;
@@ -376,6 +395,9 @@ namespace roadmarking
 	bool DataIo::readPcdFile(const std::string &fileName, const pcXYZIPtr &pointCloud, Bounds &bound_3d)
 	{
 		pcl::console::setVerbosityLevel(pcl::console::L_ALWAYS); //Ban pcl warnings
+		// To extract the inliers === Having intensity value above 0.3 value
+		pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+		pcl::ExtractIndices<pcl::PointXYZI> extract;
 		//intensity should be stored as 'intensity' (lower case i) field instead of 'Intensity' in the pcd file
 		//reference: http://www.danielgm.net/cc/forum/viewtopic.php?t=4540
 		if (pcl::io::loadPCDFile<pcl::PointXYZI>(fileName, *pointCloud) == -1) //* load the file
@@ -388,16 +410,21 @@ namespace roadmarking
                 << pointCloud->points.size()
                 << std::endl;
 
-		// Remove data points away from 5 meter range and amplifying the intensity values of the point cloud
-		for(int i = 0; i < pointCloud->points.size(); i++){
-			// if(abs(pointCloud->points[i].y) > 5){
-			// //  ||pointCloud->points[i].intensity < 0.3){
-			// 	pointCloud->points[i].intensity  = 0;
-			// }
-			// else
-				// Amplify the intensity value the point cloud
-			// pointCloud->points[i].intensity *= 100.0;
+		for (int i = 0; i < pointCloud->points.size(); i++)
+		{
+			float iAvg = 0.5;
+			if (pointCloud->points[i].intensity >= iAvg) // e.g. remove all pts below iAvg
+			{
+				pointCloud->points[i].intensity *= 100;
+				inliers->indices.push_back(i);
+			}
 		}
+		extract.setInputCloud(pointCloud);
+		extract.setIndices(inliers);
+		extract.setNegative(false);
+		extract.filter(*pointCloud);
+    
+		
 		std::cout << "Loaded Points After filtering: "
                 << pointCloud->points.size()
                 << std::endl;
@@ -902,7 +929,7 @@ namespace roadmarking
 		for (size_t i = 0; i < gcloud->points.size(); ++i)
 		{
 			// filter points with relatively high threshold (0.4) with elevation below 0
-			if(gcloud->points[i].intensity >= intensity_limit && gcloud->points[i].z <= elevation_limit){
+			// if(gcloud->points[i].intensity >= intensity_limit && gcloud->points[i].z <= elevation_limit){
 				GC->points.push_back(gcloud->points[i]);
 				// Show .PCD information
 				// std::cout << "    " << gcloud->points[i].x
@@ -910,7 +937,7 @@ namespace roadmarking
 				// << " "    << gcloud->points[i].z
 				// << " "    << gcloud->points[i].intensity
 				// << std::endl;
-			}
+			// }
 			
 		}
 
