@@ -46,7 +46,6 @@ typedef  pcl::PointCloud<pcl::PointNormal>       Point_Normal;
 typedef  pcl::PointCloud<pcl::PointXYZINormal>::Ptr  PointXYZI_Normal_Ptr;
 typedef  pcl::PointCloud<pcl::PointXYZINormal>      PointXYZI_Normal;
 
-
 namespace roadmarking
 {
 	struct CenterPoint

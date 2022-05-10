@@ -1,9 +1,11 @@
 #ifndef INCLUDE_IMAGE_H
 #define INCLUDE_IMAGE_H
 
-
+#include "polyfit.h"
 #include "utility.h"
+#include "data_io.h"
 #include <numeric>
+#include <algorithm>
 
 //pcl
 #include <pcl/point_cloud.h>  
@@ -26,6 +28,13 @@ namespace roadmarking
 	class Imageprocess
 	{
 	  public:
+		struct str{
+		bool operator() ( Point a, Point b ){
+			if ( a.y != b.y ) 
+				return a.y < b.y;
+			return a.x <= b.x ;
+			}
+		}comp;
 
 		  void pcgrid(Bounds &boundingbox, float resolution);                   
 		  
@@ -53,7 +62,8 @@ namespace roadmarking
 		  void CcaBySeedFill(const Mat& _binfilterImg, Mat & _lableImg);                
 		  
 		  void ImgReverse(const Mat &img, Mat &img_reverse);                            
-		  void ImgFilling(const Mat &img, Mat &img_fill);                              
+		  void ImgFilling(const Mat &img, Mat &img_fill);
+		  void ImgFilling(const Mat &img, Mat &img_fill, HoughConfig HC);                            
 
 		  void LabelColor(const Mat & _labelImg, Mat & _colorImg);                     
 		  Scalar GetRandomColor();                                                      
@@ -69,6 +79,12 @@ namespace roadmarking
 		  void saveimg(std::string base_folder, int file_index, const Mat &ProjI, const Mat &ProjZ, const Mat &ProjD, const Mat &ProjImf, const Mat &GI, const Mat &GZ, const Mat &BZ, const Mat &BD, const Mat &GIR, const Mat &BI, const Mat &BIF, const Mat &Label); 
 		  void saveimg(const Mat &ProjI, const Mat &ProjImf, const Mat &GI, const Mat &BI, const Mat &BIF, const Mat &Label);
 
+		  //Get the transformation
+		  void applyPrespectiveTransform(const Mat &img, Bounds& bounds);
+
+		  // Extract Pixel indices for polynomial fitting
+		  vector<vector<Point>> getNonZeroIdx(vector<Vec2f> houghLines, Mat img_h, int off_y, int off_x);
+
 		  int nx, ny; //pixel number
 		  int timin, tjmin; //truncated pixel no.
 		  float minX, minY, minZ;  //bounding box minimum value
@@ -80,11 +96,28 @@ namespace roadmarking
 		  vector<vector <int>>  labelx;  
 		  vector<vector <int>>  labely;  
 
-
-	protected:
+		protected:
 	
-	  private:
-		 
+		private:
+			void visualizeIntensityHistogram(const Mat & imgI);
+			void intensityLineSegmentDetector(const Mat & imgI);
+			vector<Vec2f> intensityHoughLineDetector(const Mat & imgI, HoughConfig HC);
+			void visualizeHoughResults(const Mat &img, const string & condition, const vector<Vec2f> & lines, int marking_width);
+			Mat generateHoughMask(const Mat &img, const vector<Vec2f> & lines, int marking_width);
+			void testPolyFit(const Mat &img, vector<Point> lane_idx);
+			vector<Point> returnHoughWindowContour(const Size& imgBounds, const Vec2f & line, const size_t & houghWinOffset);
+			vector<Point> calcLineToImgBounds(const Size& imgBounds, const Vec2f & line);
+			vector<Point> returnHoughLineBound(const Size& imgBounds, const Vec2f &line, int window_width);
+			Mat rotateFrame(Mat img, const Vec2f & trajectory_line, const size_t & num_line);			
+			// Re-ordering the contor
+			template< class T >
+			void reorder(vector<T> &v, vector<size_t> const &order )  {   
+				for ( int s = 1, d; s < order.size(); ++ s ) {
+					for ( d = order[s]; d < s; d = order[d] ) ;
+					if ( d == s ) while ( d = order[d], d != s ) swap( v[s], v[d] );
+				}
+			}
+
 	};
 
 }

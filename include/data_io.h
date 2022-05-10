@@ -6,6 +6,8 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/filters/extract_indices.h>
+
 
 #include <liblas/liblas.hpp>
 #include <liblas/version.hpp>
@@ -35,6 +37,18 @@ using namespace std;
 
 namespace roadmarking
 {
+	struct HoughConfig{
+			
+			//Hough Config
+			float trajectory_ang_rad = 2.70526;
+			float fuse_thres = 10;
+			float fuse_factor = 0.5;
+			double rho_res = 1.0 , theta_res = 1.0;
+			double decimal_tol = 2;
+			int vote_thres = 100;
+			int marking_width = 3;
+		};
+
 	class DataIo
 	{
 	public:
@@ -55,6 +69,11 @@ namespace roadmarking
 
 			float sideline_vector_distance = 4.5;
 			bool visualization_on = false;
+			HoughConfig HC;
+		};
+
+		struct GroundTruth{
+			vector<char> groundTruthVals;
 		};
 		/*
 		Parameters Notification
@@ -69,6 +88,9 @@ namespace roadmarking
 		9  overlaping_ratio_thre (controls the criterion for judging that the template matching is successful, that is, the overlapping ratio between the template model and the scene point cloud. The larger this value is, the corresponding matching accuracy would be higher and the recall would be lower) recommended: 0.7-0.8 default: 0.75
 		10 sideline_vector_distance (controls the distance threshold [unit: m] for vectorization of long edges. Adjacent edges whose endpoint distance is less than this threshold will be connected into a segment; in addition, the vectorized sampling points will also use this value as the sampling interval) recommended: 3.0-6.0 default: 4.5
 		11 visualization_on (1:on, 0:off) default: 0*/
+
+		//Loading the Ground truth label for Road Markings:2
+		void readGroundTruth(string groundTruthfile);
 
 		//Parameter List Related
 		void readParalist(string paralistfile);
@@ -131,7 +153,7 @@ namespace roadmarking
 		//display
 		void displayroad(const pcXYZIPtr &ngcloud, const pcXYZIPtr &gcloud);
 		void displayGroundwithIntensities(const pcXYZIPtr &gcloud, const float &intensity_limit, const float &elevation_limit);
-		void displayRoadwithIntensities(const pcXYZIPtr &road_cloud, const float &intensity_limit, const float &elevation_limit);
+		void displayRoadwithIntensities(const pcXYZIPtr &road_cloud, const float &intensity_limit, const float &elevation_limit, const float &y_range, const string &filename);
 		void displaymark(const vector<pcXYZI> &clouds);
 		void displaymarkwithng(const vector<pcXYZI> &clouds, const pcXYZIPtr &ngcloud);
 		void displaymarkbycategory(const vector<pcXYZI> &clouds, const RoadMarkings &roadmarkings);
@@ -142,6 +164,7 @@ namespace roadmarking
 		bool GetBoundaryOfPointCloud(pcl::PointCloud<pcl::PointXYZRGB> &pointCloud, Bounds &bound);
 
 		Paralist paralist;
+		GroundTruth groundTruth;
 
 	private:
 		void combineCloudBound(const Bounds &bound1, const Bounds &bound2, Bounds &bound);

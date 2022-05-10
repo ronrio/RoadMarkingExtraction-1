@@ -451,15 +451,29 @@
             }       
         } 
 
+        cout << "[inside] X=" << endl;
+        displayMat(X, n, k+1);
+
         // Matrix calculations
         // **************************************************************
         XT = MatTrans(X, n, k+1);                 // Calculate XT
+
+        cout << "[inside] XT=" << endl;
+        displayMat(XT, k+1, n);
+
         XTW = MatMul(k+1,n,n,XT,Weights);         // Calculate XT*W
+
+        cout << "[inside] XTW=" << endl;
+        displayMat(XTW, n, k+1);
+
         XTWX = MatMul(k+1,n,k+1,XTW,X);           // Calculate (XTW)*X
 
         if (fixedinter) XTWX[0][0] = 1.;  
         
         cofactor(XTWX, XTWXInv, k+1);             // Calculate (XTWX)^-1
+       
+        cout << "[inside] XTWXInv=" << endl;
+        displayMat(XTWXInv, k+1, k+1);
 
         for (size_t m=0; m<n; m++) {
             if (fixedinter) {
@@ -474,17 +488,17 @@
 
         if (fixedinter) beta[0] = fixedinterval;
 
-        cout << "Matrix X" << endl;
-        displayMat(X,n,k+1);
+        // cout << "Matrix X" << endl;
+        // displayMat(X,n,k+1);
 
-        cout << "Matrix XT" << endl;
-        displayMat(XT,k+1,n);
+        // cout << "Matrix XT" << endl;
+        // displayMat(XT,k+1,n);
 
-        cout << "Matrix XTW" << endl;
-        displayMat(XTW,k+1,n);
+        // cout << "Matrix XTW" << endl;
+        // displayMat(XTW,k+1,n);
 
-        cout << "Matrix XTWXInv" << endl;
-        displayMat(XTWXInv,k+1,k+1);
+        // cout << "Matrix XTWXInv" << endl;
+        // displayMat(XTWXInv,k+1,k+1);
 
 
     }
@@ -722,8 +736,9 @@
         double x[n], y[n];
         
         for(size_t i=0; i < n; i++){
-            x[i] = poi[i].x;
-            y[i] = poi[i].y;
+            x[i] = poi[i].y / 100.0;
+            y[i] = poi[i].x / 100.0;
+            cout << " X, Y: " << x[i] << " , " << y[i] << endl;
         }
 
         // Definition of other variables
@@ -769,8 +784,11 @@
         // **************************************************************
         CalculateWeights(erry, Weights, n, wtype);
         
-        cout << "Weights" << endl;
+        cout << "Weights are calculated !" << endl;
         displayMat(Weights,n,n);
+        
+        cout << "X^inv are calculated !" << endl;
+        displayMat(XTWXInv,k+1,k+1);
 
         if (determinant(Weights,n)==0.) {
             cout << "One or more points have 0 error. Review the errors on points or use no weighting. ";
@@ -781,7 +799,7 @@
         // Calculate the coefficients of the fit
         // **************************************************************
         PolyFit(x,y,n,k,fixedinter,fixedinterval,coefbeta,Weights,XTWXInv);
-
+        cout << "Polynomial is calculated !! " << endl;
 
         // // Calculate related values
             // // **************************************************************
@@ -800,13 +818,13 @@
             // // **************************************************************
             // CalculateSERRBeta(fixedinter,SE,k,serbeta,XTWXInv);
 
-            // // Display polynomial
-            // // **************************************************************
-            // DisplayPolynomial(k);
+            // Display polynomial
+            // **************************************************************
+            DisplayPolynomial(k);
 
-            // // Display polynomial coefficients
-            // // **************************************************************
-            // DisplayCoefs(k, nstar, tstudentval, coefbeta, serbeta);
+            // Display polynomial coefficients
+            // **************************************************************
+            DisplayCoefs(k, nstar, tstudentval, coefbeta, serbeta);
 
             // // Display statistics
             // // **************************************************************
@@ -846,6 +864,7 @@
         size_t x_frame_bound = frame_bounds.first, y_frame_bound = frame_bounds.second;
         std::set<double> sol;
         quadComplex sol1, sol2;
+        cout << "The Y bounds : " << 0 << ", " << y_frame_bound << endl;
 
         //first eq. (y = 0)
         sol1 = GetResults(a[2], a[1], a[0]);

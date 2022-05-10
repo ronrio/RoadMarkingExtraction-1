@@ -6,9 +6,11 @@
 #include "modelmatch.h"
 #include <chrono>
 
+
 using namespace std;
 using namespace roadmarking;
 using namespace cv;
+
 
 int main(int argc, char *argv[])
 {
@@ -197,8 +199,8 @@ int main(int argc, char *argv[])
     //[0:Original Cloud, 1 : Ground Cloud, 2 : Non - ground Cloud]
     // Image 1
     ip.pc2imgI(gcloud, 1, imgI, io.paralist.intensity_scale);
-    ip.applyPrespectiveTransform(imgI, bound_3d_temp);
-    
+    // ip.applyPrespectiveTransform(imgI, bound_3d_temp);
+
     // Image 2
     ip.pc2imgZ(ngcloud, 2, imgZ);
     // Image 3

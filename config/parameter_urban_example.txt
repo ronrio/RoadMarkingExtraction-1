@@ -1,15 +1,22 @@
 2
-600.0
-0.05
+50.0
+0.1
+0.5
 2.0
-2.5
 20
 0.05
 0.15
 0.75
 4.0
 1
-
+2.70526
+10
+0.5
+1
+1
+4
+100
+3
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 Parameters Notification
@@ -24,4 +31,12 @@ Parameters Notification
 9 overlaping_ratio_thre (controls the criterion for judging that the template matching is successful, that is, the overlapping ratio between the template model and the scene point cloud. The larger this value is, the corresponding matching accuracy would be higher and the recall would be lower) recommended: 0.7-0.8 default: 0.75
 10 sideline_vector_distance (controls the distance threshold [unit: m] for vectorization of long edges. Adjacent edges whose endpoint distance is less than this threshold will be connected into a segment; in addition, the vectorized sampling points will also use this value as the sampling interval) recommended: 3.0-6.0 default: 4.5
 11 visualization_on (1:on, 0:off) default: 0
+12 trajectory_ang_rad (the trajectory angle of the vehicle, It is fixed here with the fixed point example) 2.70526
+13 fuse_thres (controls the distance, in pixels, to fuse two detected line) default: 10
+14 fuse_factor (the fuse weight for each line, in the default case each line contributes equally) default: 0.5
+15 rho_res (resoultion of the rho parameter for Hough Algorithm, in pixels) default: 1
+16 theta_res (resoultion of the theta parameter for Hough Algorithm, in degrees) default: 1
+17 decimal_tol (controls the number of decimals to tolerate angle difference among a group of parallel lines): default: 1
+18 vote_thres (number of votes needed by the Hough algorithm to detect a line, the higher, the more robust is the detection with less lines) default: 100
+19 marking_width (controls the width of a detected marking, in pixels. Relative to the grid resolution,the marking width can be tuned) default 3
 --------------------------------------------------------------------------------------------------------------------------------------------

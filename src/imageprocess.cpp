@@ -1124,7 +1124,23 @@ namespace roadmarking
 			}
 		}
 
-		img_fill = intensityHoughLineDetector(255 * img_fill,HC) / 255;
+		vector<Vec2f> houghLines = intensityHoughLineDetector(255 * img_fill,HC);
+
+		// Transform the image into a horizontal Orientation
+		Vec2f trajectory_line = houghLines[0];
+		int off_y = 50, off_x = 10;
+		Mat img_h;
+		cout << "Vehicle trajectory line : " << trajectory_line << endl;
+		img_h = rotateFrame(255 * img_fill, trajectory_line, 0);
+		
+		// Only line instances should be rotated
+		houghLines = intensityHoughLineDetector(img_h,HC);
+		vector<vector<Point>> polyList_idx = getNonZeroIdx(houghLines, img_h, off_y, off_x);
+
+		// //fit polynomial to per line
+		// for(size_t line_i = 0; polyList_idx.size(); line_i++){
+		// 	testPolyFit(img_h, polyList_idx[line_i]);
+		// }
 	}
 
 	void Imageprocess::DetectCornerShiTomasi(const Mat &src, const Mat &colorlabel, Mat &cornerwithimg, int minDistance, double qualityLevel)
@@ -1352,7 +1368,7 @@ namespace roadmarking
 
 	}
 
-	Mat Imageprocess::intensityHoughLineDetector(const Mat & imgI, HoughConfig HC){
+	vector<Vec2f> Imageprocess::intensityHoughLineDetector(const Mat & imgI, HoughConfig HC){
 
 		Mat dst;
 		vector<Vec2f> lines, filtered_lines; // will hold the results of the detection
@@ -1367,12 +1383,12 @@ namespace roadmarking
 
 		// Edge detection
 		Canny(imgI, dst, 50, 200, 3);
-
+		cout << "=========AFTER CANNY=========" << endl;
 		// Standard Hough Line Transform
 		HoughLines(dst, lines, rho_res, theta_res * CV_PI/180, vote_thres, 0, 0 ); // runs the actual detection
-
+		
 		visualizeHoughResults(imgI, "after_hough_detect", lines, HC.marking_width);
-
+		cout << "=========AFTER HOUGH=========" << endl;
 		// Getting the most dominant theta 
 		map<float,vector<Vec2f>> parallel_dict;
 
@@ -1384,9 +1400,7 @@ namespace roadmarking
 			// 			filtered_lines.push_back(lines[i]);
 			// 		}
 			// }
-
-
-
+		cout << "=========BEFORE PARALLEL FILTERING =========" << endl;
 		// Searching for the maximum of parallal lines
 		for( size_t i = 0; i < lines.size(); i++)
 		{
@@ -1410,9 +1424,10 @@ namespace roadmarking
 			}
 		}
 		filtered_lines = parallel_dict[dominantTheta];
-		
-		visualizeHoughResults(imgI, "after_parallel_filtering", filtered_lines, HC.marking_width);
 
+		visualizeHoughResults(imgI, "after_parallel_filtering", filtered_lines, HC.marking_width);
+		cout << "=========AFTER PARALLEL FILTERING =========" << endl;
+		cout << "=========BEFORE FUSING =========" << endl;
 		// Fusing close lines
 		if (filtered_lines.size() > 0){
 			for( size_t i = 0; i < filtered_lines.size()-1; i++)
@@ -1438,15 +1453,13 @@ namespace roadmarking
 		}
 
 		visualizeHoughResults(imgI, "after_line_fusing", filtered_lines, HC.marking_width);
-		return generateHoughMask(imgI, filtered_lines, HC.marking_width);
+		cout << "=========AFTER FUSING =========" << endl;
+		return filtered_lines;
 	}
 
 	void Imageprocess::visualizeHoughResults(const Mat &img, const string & condition, const vector<Vec2f> & lines, int marking_width){
 		
 		Mat cdst;
-
-		// Get an extreme boundry of the image to guarantee that lines will cut the end
-		int max_dim = 2*max(img.rows,img.cols); 
 
 		// Copy edges to the images that will display the results in BGR
 		cvtColor(img, cdst, COLOR_GRAY2BGR);
@@ -1456,29 +1469,9 @@ namespace roadmarking
 		for( size_t i = 0; i < lines.size(); i++)
 		{
 			cout << "Line # " << i << " : " << lines[i] << endl;
-			float rho = lines[i][0], theta = lines[i][1];
-			Point pt1, pt2;
-			double a = cos(theta), b = sin(theta);
-			double x0 = a*rho, y0 = b*rho;
-			pt1.x = cvRound(x0 + max_dim*(-b));
-			pt1.y = cvRound(y0 + max_dim*(a));
-			pt2.x = cvRound(x0 - max_dim*(-b));
-			pt2.y = cvRound(y0 - max_dim*(a));
-			// cout << "Points: " << pt1 << " , " <<  pt2 << endl;
-			line( cdst, pt1, pt2, Scalar(0,0,255), marking_width, LINE_AA);
-
-			cout << "==============================" << endl;
-			// Get all pixel indices of line points intersecting an image boundries
-			LineIterator lineIt(img, pt1, pt2);
-			// Get extreme points of the lines
-			cout << "The first point clipping the image: " << lineIt.pos() << endl;
-			size_t j = 0;
-			while(j < lineIt.count){
-				j++;
-				lineIt++;
-			}
-			cout << "The last point clipping the image: " << lineIt.pos() << endl;
-
+			vector<Point> lineImgBounds = returnHoughLineBound(img.size(), lines[i], marking_width);
+			Point Pt1 = lineImgBounds[0], Pt2 = lineImgBounds[1];
+			line( cdst, Pt1, Pt2, Scalar(0,0,255), marking_width, LINE_AA);
 		}
 		imwrite("Hough_transform_img_" + condition + ".jpg",cdst);
 	}
@@ -1491,115 +1484,398 @@ namespace roadmarking
 		int max_dim = 2*max(img.rows,img.cols); 
 		for( size_t i = 0; i < lines.size(); i++)
 		{
-			float rho = lines[i][0], theta = lines[i][1];
-			Point pt1, pt2;
-			double a = cos(theta), b = sin(theta);
-			double x0 = a*rho, y0 = b*rho;
-			pt1.x = cvRound(x0 + max_dim*(-b));
-			pt1.y = cvRound(y0 + max_dim*(a));
-			pt2.x = cvRound(x0 - max_dim*(-b));
-			pt2.y = cvRound(y0 - max_dim*(a));
-
-			line( cdst, pt1, pt2, Scalar(255), marking_width, LINE_AA);
-
-			cout << "===============Line Endpoint Indices===============" << endl;
-			// Get all pixel indices of line points intersecting an image boundries
-			LineIterator lineIt(img, pt1, pt2);
-			// Get extreme points of the lines
-			cout << "The first point clipping the image: " << lineIt.pos() << endl;
-			size_t j = 0;
-			while(j < lineIt.count){
-				j++;
-				lineIt++;
-			}
-			cout << "The last point clipping the image: " << lineIt.pos() << endl;
+			cout << "Line # " << i << " : " << lines[i] << endl;
+			vector<Point> lineImgBounds = returnHoughLineBound(img.size(), lines[i], marking_width);
+			Point Pt1 = lineImgBounds[0], Pt2 = lineImgBounds[1];
+			line( cdst, Pt1, Pt2, Scalar(255), marking_width, LINE_AA);
 		}
+
 		cv::bitwise_and(img, cdst, seg_Mat);
-		// testPolyFit(img);
 		return seg_Mat;
 	}
 
-	// Is the error proportional to significance of the y or not ?
-	void Imageprocess::testPolyFit(const Mat & img){
-		Mat cdst(Size(img.rows,img.cols), CV_8UC3, Scalar(0,0,0));
+	vector<Point> Imageprocess::calcLineToImgBounds(const Size& imgBounds, const Vec2f & line){
+		vector<Point> lineBound;
+		int WIDTH = imgBounds.width, HEIGHT = imgBounds.height;
+		cout << "WIDTH X HEIGHT : " << WIDTH << "  " << HEIGHT << endl;
+		float rho = line[0], theta = line[1];
+		cout << "RHO Value: " << rho << "   " << "THETA value: " << theta  << endl;
+		float x, y, a, b; // for testing boundry point
+		Point boundPoint;
 
-		vector<Point> poi = {{20,0}, {100,15}, {250,30}, {500,100}, {1000,1000}}; //Don't define points like this, it is confusing !!
-		size_t n = 5;
-		double erry[5] = {0.0};
-		for(size_t i = 0; i < poi.size(); i++)
+		// Check for y limits
+		y = 0;
+		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
+		x = a * y + b;
+		cout << "A: " << a << endl;
+		cout << "B: " << b << endl;
+		cout << "X: " << x << endl;
+		cout << "CV_ROUND X: " << cvRound(x) << endl;
+		if (x >= 0 && x <= HEIGHT){
+			boundPoint.y = cvRound(x);
+			boundPoint.x = cvRound(y);
+			lineBound.push_back(boundPoint);
+			cout << "[y=0] A found boundry point : " << boundPoint << endl;
+		}
+
+		y = WIDTH;
+		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
+		x = a * y + b;
+		cout << "A: " << a << endl;
+		cout << "B: " << b << endl;
+		cout << "X: " << x << endl;
+		cout << "CV_ROUND X: " << cvRound(x) << endl;
+		if (x >= 0 && x <= HEIGHT){
+			boundPoint.y = cvRound(x);
+			boundPoint.x = cvRound(y);
+			lineBound.push_back(boundPoint);
+			cout << "[y = WIDTH] A found boundry point : " << boundPoint << endl;
+		}
+
+		//Check for x limits
+		x = 0;
+		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
+		y = (x - b) * pow(a, -1);
+		cout << "A: " << a << endl;
+		cout << "B: " << b << endl;
+		cout << "Y: " << y << endl;
+		cout << "CV_ROUND Y: " << cvRound(y) << endl;
+		if (y >= 0 && y <= WIDTH){
+			boundPoint.y = cvRound(x);
+			boundPoint.x = cvRound(y);
+			lineBound.push_back(boundPoint);
+			cout << "[x = 0;] A found boundry point : " << boundPoint << endl;
+		}
+
+		x = HEIGHT;
+		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
+		y = (x - b) * pow(a, -1);
+		cout << "A: " << a << endl;
+		cout << "B: " << b << endl;
+		cout << "Y: " << y << endl;
+		cout << "CV_ROUND Y: " << cvRound(y) << endl;
+		if (y >= 0 && y <= WIDTH){
+			boundPoint.y = cvRound(x);
+			boundPoint.x = cvRound(y);
+			lineBound.push_back(boundPoint);
+			cout << "[x = HEIGHT;] A found boundry point : " << boundPoint << endl;
+		}
+
+		//TODO: Handle the case for the offset outside the image boundry
+		return lineBound;
+	}
+
+	//TODO: It fails when the lines are vertical
+	//TODO: Indices should be switched !!
+	vector<Point> Imageprocess::returnHoughLineBound(const Size& imgBounds, const Vec2f &line, int window_width){
+		vector<Point> lineBound;
+		int WIDTH = imgBounds.width, HEIGHT = imgBounds.height;
+		cout << "WIDTH X HEIGHT : " << WIDTH << "  " << HEIGHT << endl;
+		float rho = line[0], theta = line[1];
+		// TODO: What should happen if the angle is 0: 1/sin(0) == inf
+		if (theta == 0)
+			theta = 0.0001;
+		cout << "RHO Value: " << rho << "   " << "THETA value: " << theta  << endl;
+		float x, y, a, b; // for testing boundry point
+		Point boundPoint;
+
+		// Check for y limits
+		y = 0;
+		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
+		x = a * y + b;
+		if (x >= 0 && x <= HEIGHT){
+			boundPoint.y = cvRound(x);
+			boundPoint.x = cvRound(y);
+			lineBound.push_back(boundPoint);
+			cout << "[y = 0] A found boundry point : " << boundPoint << endl;
+		}
+
+		y = WIDTH;
+		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
+		x = a * y + b;
+		if (x >= 0 && x <= HEIGHT){
+			boundPoint.y = cvRound(x);
+			boundPoint.x = cvRound(y);
+			lineBound.push_back(boundPoint);
+			cout << "[y = WIDTH] A found boundry point : " << boundPoint << endl;
+		}
+
+		//Check for x limits
+		x = 0;
+		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
+		cout << "A: " << a << endl;
+		y = (x - b) * pow(a, -1);
+		if (y >= 0 && y <= WIDTH){
+			boundPoint.y = cvRound(x);
+			boundPoint.x = cvRound(y);
+			lineBound.push_back(boundPoint);
+			cout << "[x = 0;] A found boundry point : " << boundPoint << endl;
+		}
+
+		x = HEIGHT;
+		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
+		cout << "A: " << a << endl;
+		y = (x - b) * pow(a, -1);
+		if (y >= 0 && y <= WIDTH){
+			boundPoint.y = cvRound(x);
+			boundPoint.x = cvRound(y);
+			lineBound.push_back(boundPoint);
+			cout << "[x = HEIGHT;] A found boundry point : " << boundPoint << endl;
+		}
+
+		cout << "=======================================" << endl;
+		cout << "Line bound Point # :"; 
+		for(size_t i = 0; i < lineBound.size(); i++){
+			cout << " " << lineBound[i];
+		}
+		cout << endl << "=======================================" << endl;
+
+
+		//TODO: Handle the case for the offset outside the image boundry
+		return lineBound;
+	}
+
+	Mat Imageprocess::rotateFrame(Mat img, const Vec2f & trajectory_line, const size_t &num_line){
+		// TODO: Should be a user defined input instead !!
+		double theta = trajectory_line[1];
+		double rot_angle_in_degrees = (theta - CV_PI / 2.0)  * (180 / CV_PI);
+		cout << " Trajectory Angle: " << (theta *(180 / CV_PI)) << endl;
+		cout << " Rotation Angle : " << rot_angle_in_degrees << endl;
+		// get rotation matrix for rotating the image around its center in pixel coordinates
+		cv::Point2f center((img.cols-1)/2.0, (img.rows-1)/2.0);
+		cv::Mat rot = cv::getRotationMatrix2D(center, rot_angle_in_degrees, 1.0);
+		// determine bounding rectangle, center not relevant
+		cv::Rect2f bbox = cv::RotatedRect(cv::Point2f(), img.size(), rot_angle_in_degrees).boundingRect2f();
+		// adjust transformation matrix
+		rot.at<double>(0,2) += bbox.width/2.0 - img.cols/2.0;
+		rot.at<double>(1,2) += bbox.height/2.0 - img.rows/2.0;
+
+		Mat dst;
+		img.copyTo(dst);
+		cv::warpAffine(img, dst, rot, bbox.size());
+		imwrite("rotated_img_"+to_string(num_line)+".png", dst);
+		return dst;
+		//TODO: Revert it back to the original orientation
+	}
+
+	vector<vector<Point>> Imageprocess::getNonZeroIdx(vector<Vec2f> houghLines, Mat img_h, int off_y, int off_x){
+		
+		vector<vector<Point>> idxList; 
+
+		// Initialize the vector of line indices
+		idxList.resize(houghLines.size());
+
+		// Parameters of your slideing window
+		int windows_n_rows = 2 * off_x + 1; 
+		int windows_n_cols = 2 * off_y + 1; 
+
+		// Slidding step if the center of mass is the same
+		int StepSlide = off_y;
+
+		Mat src = img_h.clone();
+		Mat disp_src;
+		cvtColor(img_h, disp_src, COLOR_GRAY2BGR);
+
+		//TODO: Put limit of x moves
+		for(size_t line_i = 0; line_i < houghLines.size(); line_i++){
+			vector<Point> lineImgBounds = returnHoughLineBound(src.size(), houghLines[line_i], 5);
+			Point line_start = lineImgBounds[0], line_end = lineImgBounds[1];
+			line(disp_src, line_start, line_end, Scalar(0, 0, 255), 2);
+			
+			int win_start_x, win_start_y;
+
+			// Window boundry initilaization
+			win_start_x = max(0, line_start.y - off_x);
+			win_start_y = max(0, line_start.x);
+
+			cout << "===============CURR WIN===============" << endl;
+			cout << "X, Y, WIDTH & HEIGHT: " << win_start_x << "," << win_start_y << "," << windows_n_cols << "," << windows_n_rows << endl;
+			cout << "============================================="<< endl;
+
+			while (win_start_x < (src.rows - windows_n_rows) && win_start_y < (src.cols - windows_n_cols)){
+			
+				Point start_circle, end_circle, mass_center;
+				start_circle.x = win_start_y;
+				start_circle.y = win_start_x;
+				end_circle = start_circle;
+				end_circle.x += windows_n_cols;
+				end_circle.y += windows_n_rows;
+
+				circle(disp_src, start_circle, 2, Scalar(255, 0, 0), 2);
+				circle(disp_src, end_circle, 2, Scalar(255, 0, 255), 2);
+
+				cout << "===============CURR WIN===============" << endl;
+				cout << "X, Y, WIDTH & HEIGHT: " << win_start_x << "," << win_start_y << "," << windows_n_cols << "," << windows_n_rows << endl;
+				cout << "============================================="<< endl;
+				Rect marking_win(win_start_y, win_start_x, windows_n_cols, windows_n_rows);
+				Mat roi = src(marking_win);
+				// cout << "===============DISP CURR ROI===============" << endl;
+				// cout << "Window Info. : " << marking_win << endl;
+				// // Draw only rectangle
+				// rectangle(disp_src, marking_win, Scalar(0,255,0), 1);
+				// imshow("current roi", disp_src);
+				// waitKey();
+				// cout << "============================================="<< endl;
+				vector<Point> nonzero_region;
+				findNonZero(roi, nonzero_region);
+				// cout << "===============BEFORE ACCUMM: NON ZERO POINT===============" << endl;
+				// for (size_t idx = 0; idx < nonzero_region.size(); idx++)
+				// 	cout << nonzero_region[idx] << endl;
+				// cout << "============================================="<< endl;
+				// cout << "===============AFTER ACCUMM: NON ZERO POINT===============" << endl;
+				// for (size_t idx = 0; idx < nonzero_region.size(); idx++){
+				// 	nonzero_region[idx].x += win_start_y;
+				// 	nonzero_region[idx].y += win_start_x;
+				// 	cout << nonzero_region[idx] << endl;
+				// }
+				// cout << "============================================="<< endl;
+				// idxList[line_i].insert(idxList[line_i].end(), nonzero_region.begin(), nonzero_region.end());
+				
+				// find moments of the image
+				Moments m = moments(roi,true);
+				Point p(m.m10/m.m00, m.m01/m.m00);
+
+				// coordinates of centroid
+				cout << "===============CURR CENTROID===============" << endl;
+				cout<< "Coordinates of the centroid is : " << p << endl;
+				cout << "============================================="<< endl;
+				
+				//Check if the centroid is already the center of this round.
+				//TODO: What would happen if the blob is black
+				win_start_y += windows_n_cols;
+				
+				if(p.y != 0 || p.x != 0){
+					int off_shift = p.y - off_x; //Shift accordingly upwards if the diff is negative, vice versa if downwards
+					win_start_x += off_shift;
+					mass_center.x = win_start_y - off_y;
+					mass_center.y = win_start_x + off_x;
+					circle(disp_src, mass_center, 2, Scalar(100, 255, 0), 2);
+					rectangle(disp_src, marking_win, Scalar(0,255,0), 1);
+					imshow("Center of Mass", disp_src);
+					waitKey();
+					// Append only the center of mass
+					idxList[line_i].push_back(mass_center);
+				}
+				src(marking_win) = 0; disp_src(marking_win) = 0; // Set already processed region to zero so we won't accumlate them again.	
+			}
+			// testPolyFit(img_h, idxList[line_i]);
+			polylines(disp_src, idxList[line_i], false, Scalar(0,255,0),2);
+			imshow("PolyLine result", disp_src);
+			waitKey();
+		}
+		return idxList;
+	}
+
+	// Is the error proportional to significance of the y or not ?
+	void Imageprocess::testPolyFit(const Mat & img, vector<Point> lane_idx){
+
+		Mat cdst(Size(img.rows,img.cols), CV_8UC3, Scalar(0,0,0));
+		cout << "The image boundries : " << img.rows << " , " << img.cols << endl;
+		size_t n = lane_idx.size();
+		double erry[n] = {0.0};
+		for(size_t i = 0; i < lane_idx.size(); i++)
 		{
-			circle(cdst, poi[i], 50, Scalar(255,255,255), 8,0);
+			cout << "Point : " << lane_idx[i] <<  " , " << erry[i] << endl;
+			circle(cdst, lane_idx[i], 10, Scalar(255,255,255), 8,0);
 		}
-		// const double x[4] = {0, 15, 30, 100};
-		// double y[4] = {20, 100, 250, 500};
-		// const size_t n = 4, k = 2, x_range = img.rows;
-		for(size_t i=0; i < poi.size(); i++){
-			cout << "Display point: " << poi[i] << endl;
-		}
-		vector<Point> out = polyfit::PolyFitCV(poi, erry, 2, std::pair<size_t,size_t>(img.rows, img.cols));
+		cout << "The size of the samples: " << lane_idx.size() << endl;
+		// resize(cdst, cdst, Size(), 0.5, 0.5, INTER_LINEAR);
+		// imwrite("poly_line_img.jpg",cdst);
+		
+		// for(size_t i=0; i < lane_idx.size(); i++){
+		// 	cout << "Display point: " << lane_idx[i] << endl;
+		// }
+
+		vector<Point> out = polyfit::PolyFitCV(lane_idx, erry, 2, std::pair<size_t,size_t>(img.rows, img.cols));
 		polylines(cdst, out, false, Scalar(0,255,0), 3);
-		resize(cdst, cdst, Size(), 0.5, 0.5, INTER_LINEAR);
+		// // resize(cdst, cdst, Size(), 0.5, 0.5, INTER_LINEAR);
 		imwrite("poly_line_img.jpg",cdst);
 	}
 
 	void Imageprocess::applyPrespectiveTransform(const Mat &img, Bounds& bounds){
-	Mat img_tmp(img.size(), CV_8UC1), tansform_mat;
-	vector<Vec2f> src, dst;
-	Vec2f vertex_src, vertex_dst;
+		Mat img_tmp(img.size(), CV_8UC1), tansform_mat;
+		vector<Vec2f> src, dst;
+		Vec2f vertex_src, vertex_dst;
 
-	// Get the source boundry points
-	
-	// Up Left
-	vertex_src[0] = bounds.min_x;
-	vertex_src[1] = bounds.min_y;
-	src.push_back(vertex_src);
-	
-	//Up Right
-	vertex_src[0] = bounds.min_x;
-	vertex_src[1] = bounds.max_y;
-	src.push_back(vertex_src);
+		// Get the source boundry points
+		
+		// Up Left
+		vertex_src[0] = bounds.min_x;
+		vertex_src[1] = bounds.min_y;
+		src.push_back(vertex_src);
+		
+		//Up Right
+		vertex_src[0] = bounds.min_x;
+		vertex_src[1] = bounds.max_y;
+		src.push_back(vertex_src);
 
-	//Down Right
-	vertex_src[0] = bounds.max_x;
-	vertex_src[1] = bounds.max_y;
-	src.push_back(vertex_src);
+		//Down Right
+		vertex_src[0] = bounds.max_x;
+		vertex_src[1] = bounds.max_y;
+		src.push_back(vertex_src);
 
-	//Down Left
-	vertex_src[0] = bounds.max_x;
-	vertex_src[1] = bounds.min_y;
-	src.push_back(vertex_src);
+		//Down Left
+		vertex_src[0] = bounds.max_x;
+		vertex_src[1] = bounds.min_y;
+		src.push_back(vertex_src);
 
-	// Get the destination boundry points
-	
-	// Up Left
-	vertex_dst[0] = 0;
-	vertex_dst[1] = 0;
-	dst.push_back(vertex_dst);
-	
-	//Up Right
-	vertex_dst[0] = 0;
-	vertex_dst[1] = bounds.max_y;
-	dst.push_back(vertex_dst);
+		// Get the destination boundry points
+		
+		// Up Left
+		vertex_dst[0] = 0;
+		vertex_dst[1] = 0;
+		dst.push_back(vertex_dst);
+		
+		//Up Right
+		vertex_dst[0] = 0;
+		vertex_dst[1] = bounds.max_y;
+		dst.push_back(vertex_dst);
 
-	//Down Right
-	vertex_dst[0] = bounds.max_x;
-	vertex_dst[1] = bounds.max_y;
-	dst.push_back(vertex_dst);
+		//Down Right
+		vertex_dst[0] = bounds.max_x;
+		vertex_dst[1] = bounds.max_y;
+		dst.push_back(vertex_dst);
 
-	//Down Left
-	vertex_dst[0] = bounds.max_x;
-	vertex_dst[1] = 0;
-	dst.push_back(vertex_dst);
+		//Down Left
+		vertex_dst[0] = bounds.max_x;
+		vertex_dst[1] = 0;
+		dst.push_back(vertex_dst);
 
-	// Compute the transformation matrix
-	tansform_mat = getPerspectiveTransform(src,dst);
-	warpPerspective(img, img_tmp, tansform_mat, img.size());
+		// Compute the transformation matrix
+		tansform_mat = getPerspectiveTransform(src,dst);
+		warpPerspective(img, img_tmp, tansform_mat, img.size());
 
-	// Display the result
-	imshow("After Prespective Transformation", img_tmp);
-	// Display the result
-	imshow("Before Prespective Image", img);
-	waitKey(0);
+		// Display the result
+		imshow("After Prespective Transformation", img_tmp);
+		// Display the result
+		imshow("Before Prespective Image", img);
+		waitKey(0);
+	}
 
+	vector<Point> Imageprocess::returnHoughWindowContour(const Size& imgBounds, const Vec2f & line, const size_t & houghWinOffset){
+
+		vector<Point> lineBounds;
+		Vec2f boundingLine;
+
+		int WIDTH = imgBounds.width, HEIGHT = imgBounds.height;
+		//Get lower bounding line end points
+		boundingLine = {line[0] - houghWinOffset, line[1]};
+		vector<Point> lowerBounds = calcLineToImgBounds(imgBounds, boundingLine);
+		lineBounds.insert(lineBounds.end(), lowerBounds.begin(), lowerBounds.end());
+
+		//Get upper bounding line end points
+		boundingLine = {line[0] + houghWinOffset, line[1]};
+		vector<Point> upperBounds = calcLineToImgBounds(imgBounds, boundingLine);
+		lineBounds.insert(lineBounds.end(), upperBounds.begin(), upperBounds.end());
+
+		cout << "AFTER: =======================================" << endl;
+		cout << "Contour bound:"; 
+		for(size_t i = 0; i < lineBounds.size(); i++){
+			cout << " " << lineBounds[i];
+		}
+		cout << endl << "=======================================" << endl;
+
+		return lineBounds;
+		
 	}
 }
