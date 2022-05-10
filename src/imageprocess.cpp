@@ -119,6 +119,7 @@ namespace roadmarking
 		double mini, maxi;	//min and max Intensity
 		double meani, stdi; //mean and standard deviation of Intensity
 		int Number_non_zero_pixel;
+		int max_per_cell = INT_MIN, min_per_cell = INT_MAX;
 
 		meani = 0;
 		stdi = 0;
@@ -160,10 +161,22 @@ namespace roadmarking
 			{
 				for (int j = 0; j < ny; j++)
 				{
+					int num_i = 0;
 					for (auto k = GCMatrixIndice[i][j].begin(); k != GCMatrixIndice[i][j].end(); ++k) 
-						matrixi[i][j].push_back(cloud->points[*k].intensity);			
+						{
+							matrixi[i][j].push_back(cloud->points[*k].intensity);
+							num_i++;
+						}			
+						if(max_per_cell < num_i)
+							max_per_cell = num_i;
+						if(min_per_cell > num_i)
+							min_per_cell = num_i;
 				}
 			}
+			cout << "=========CELL GRID STATS.=========" << endl;
+			cout << "Maximum number of PC per cell : " << max_per_cell << endl;
+			cout << "Minimum number of PC per cell : " << min_per_cell << endl;
+			cout << "====================================" << endl;
 			break;
 		case 2: //Non-Ground Point Cloud
 			for (int i = 0; i < nx; i++)
@@ -185,15 +198,33 @@ namespace roadmarking
 			}
 		}
 
+		// Visualizing the intensity matrix
+		cv::Mat matIntensities(ave.size(), ave.at(0).size(), CV_32FC1);
+		//Initialize m
+		double minVal; 
+		double maxVal; 
+		Point minLoc; 
+		Point maxLoc;
+
+		for(int i=0; i<matIntensities.rows; ++i)
+			for(int j=0; j<matIntensities.cols; ++j)
+				matIntensities.at<float>(i, j) = ave[i][j];
+
+		minMaxLoc(matIntensities, &minVal, &maxVal, &minLoc, &maxLoc );
+		cout << "Min Val of intensities: " << minVal << endl;
+		cout << "Max Val of intensities: " << maxVal << endl;
+		resize(matIntensities, matIntensities, Size(), 0.75, 0.75, INTER_LINEAR);
+		// imshow("Intensity Image Plot ", matIntensities);
+
 		for (int i = 0; i < nx; i++)
 		{
 			for (int j = 0; j < ny; j++)
 			{
-				if (ave[i][j] > 1) 
-				{
+				// if (ave[i][j] > 1) 
+				// {
 					meani += ave[i][j];
 					Number_non_zero_pixel++;
-				}
+				// }
 			}
 		}
 		meani /= Number_non_zero_pixel;
@@ -205,10 +236,10 @@ namespace roadmarking
 		{
 			for (int j = 0; j < ny; j++)
 			{
-				if (ave[i][j] > 1)
-				{
+				// if (ave[i][j] > 1)
+				// {
 					stdi += (ave[i][j] - meani) * (ave[i][j] - meani);
-				}
+				// }
 			}
 		}
 
@@ -229,7 +260,9 @@ namespace roadmarking
 				img.at<uchar>(i, j) = 255 * ave[i][j] / maxi ;
 			}
 		}
+		// imshow("Intensity image after scaling", img);
 		// visualizeIntensityHistogram(img);
+		// waitKey();
 	}
 
 	void Imageprocess::pc2imgZ(const pcXYZIPtr &cloud, int whatcloud, Mat &img)
@@ -351,7 +384,7 @@ namespace roadmarking
 		//else maxnum = expectedmaxnum;
 		maxnum = expected_max_point_num_in_a_pixel;
 
-		//cout << "max point number"<<maxnum<<endl;
+		cout << "max point number: "<<maxnum<<endl;
 		for (size_t i = 0; i < nx; i++)
 		{
 			for (size_t j = 0; j < ny; j++)
@@ -1128,7 +1161,7 @@ namespace roadmarking
 
 		// Transform the image into a horizontal Orientation
 		Vec2f trajectory_line = houghLines[0];
-		int off_y = 50, off_x = 10;
+		int off_y = 30, off_x = 5;
 		Mat img_h;
 		cout << "Vehicle trajectory line : " << trajectory_line << endl;
 		img_h = rotateFrame(255 * img_fill, trajectory_line, 0);
@@ -1312,8 +1345,7 @@ namespace roadmarking
 		// Resize the image so we would be able to visualize it
 		resize(imgI, imgI_down, Size(WIDTH, HEIGHT), INTER_LINEAR);
 
-		cv::imshow("Source image", imgI_down);
-		imshow("calcHist Demo", histImage );
+		imwrite("Intensity_scales_hist.png", histImage );
 		waitKey();
 	}
 	void Imageprocess::intensityLineSegmentDetector(const Mat & imgI){
@@ -1751,6 +1783,8 @@ namespace roadmarking
 					mass_center.y = win_start_x + off_x;
 					circle(disp_src, mass_center, 2, Scalar(100, 255, 0), 2);
 					rectangle(disp_src, marking_win, Scalar(0,255,0), 1);
+					Mat disp_tmp;
+					// resize(disp_src, disp_tmp, Size(), 0.25, 0.25, INTER_LINEAR);
 					imshow("Center of Mass", disp_src);
 					waitKey();
 					// Append only the center of mass
@@ -1758,8 +1792,10 @@ namespace roadmarking
 				}
 				src(marking_win) = 0; disp_src(marking_win) = 0; // Set already processed region to zero so we won't accumlate them again.	
 			}
-			// testPolyFit(img_h, idxList[line_i]);
+			testPolyFit(img_h, idxList[line_i]);
 			polylines(disp_src, idxList[line_i], false, Scalar(0,255,0),2);
+			Mat disp_tmp;
+			// resize(disp_src, disp_tmp, Size(), 0.25, 0.25, INTER_LINEAR);
 			imshow("PolyLine result", disp_src);
 			waitKey();
 		}
@@ -1786,8 +1822,8 @@ namespace roadmarking
 		// 	cout << "Display point: " << lane_idx[i] << endl;
 		// }
 
-		vector<Point> out = polyfit::PolyFitCV(lane_idx, erry, 2, std::pair<size_t,size_t>(img.rows, img.cols));
-		polylines(cdst, out, false, Scalar(0,255,0), 3);
+		// vector<Point> out = polyfit::PolyFitCV(lane_idx, erry, 2, std::pair<size_t,size_t>(img.rows, img.cols));
+		// polylines(cdst, out, false, Scalar(0,255,0), 3);
 		// // resize(cdst, cdst, Size(), 0.5, 0.5, INTER_LINEAR);
 		imwrite("poly_line_img.jpg",cdst);
 	}

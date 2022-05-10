@@ -201,6 +201,21 @@ int main(int argc, char *argv[])
     ip.pc2imgI(gcloud, 1, imgI, io.paralist.intensity_scale);
     // ip.applyPrespectiveTransform(imgI, bound_3d_temp);
 
+    //5.3.2. Morphological Operations: Dilation and Closing (Optional)
+    // Mat imgI_tmp, imgI_morph;
+    Mat dilate_element = getStructuringElement(MORPH_RECT, Size(3, 11));
+    Mat open_element = getStructuringElement(MORPH_RECT, Size(5, 5));
+    // dilate(imgI, imgI_morph, dilate_element);
+    // imwrite("after_morph_dilate.png", imgI_morph);
+    // morphologyEx(imgI_morph, imgI_morph, MORPH_OPEN, open_element);
+		// dilate(imgIbfilter, dilateImg, Mat(),element);
+		//erode(dilateImg, closeImg, Mat());  // ->closeImg
+    // resize(imgI, imgI_tmp, Size(), 0.25, 0.25, INTER_LINEAR);
+    // resize(imgI_morph, imgI_morph, Size(), 0.25, 0.25, INTER_LINEAR);
+    // imwrite("before_morph.png", imgI_tmp);
+    // imwrite("after_morph_open.png", imgI_morph);
+    // waitKey();
+
     // Image 2
     ip.pc2imgZ(ngcloud, 2, imgZ);
     // Image 3
@@ -208,9 +223,11 @@ int main(int argc, char *argv[])
     { // For MLS
         float expectedmaxnum;
         expectedmaxnum = io.paralist.density_threshold * density * resolution * resolution; // expectedmaxnum: expected max point number in a pixel
+        cout << " The expected max num of points per pixel: " << expectedmaxnum << endl;
         ip.pc2imgD(gcloud, 1, imgD, expectedmaxnum);
     }
     cout << "Point Cloud --> Geo-referneced Image done\n";
+    
     //Step 5. Image Processing
     //5.1.1 Median filter  (Optional)
     // Image 4
@@ -236,11 +253,25 @@ int main(int argc, char *argv[])
         imgDbinary = ip.maxEntropySegMentation(imgD); // for MLS
         // Image 9
         imgIgradientroad = ip.ExtractRoadPixelIZD(imgIgradient, imgZbinary, imgDbinary); //Use the slope and point density as the criterion
+        // dilate_element = getStructuringElement(MORPH_RECT, Size(3, 3));
+        // open_element = getStructuringElement(MORPH_RECT, Size(3, 3));
+        // dilate(imgIgradientroad, imgIgradientroad, dilate_element);
+        // morphologyEx(imgIgradientroad, imgIgradientroad, MORPH_OPEN, open_element);
+
     }
     else if (datatype == 2)
         imgIgradientroad = ip.ExtractRoadPixelIZ(imgIgradient, imgZbinary); //for ALS
     // Image 10
+    // Apply morpholofical operation here as 
     imgIbinary = ip.maxEntropySegMentation(imgIgradientroad);
+    // dilate_element = getStructuringElement(MORPH_RECT, Size(5, 5));
+    // open_element = getStructuringElement(MORPH_RECT, Size(3, 3));
+    // dilate(imgIbinary, imgIbinary, dilate_element);
+    // morphologyEx(imgIbinary, imgIbinary, MORPH_CLOSE, open_element);
+    // imwrite("Open_morph_imgIbinary.png", imgIbinary);
+
+    // resize(imgIbinary, imgBTmp, Size(), 0.15, 0.15, INTER_LINEAR);
+    // imwrite("Road_Intensity_Gred_Image_100.png", imgIgradientroad + 100);
     //However, Max Entropy Method is not efficient enough
 
     //5.3. Intensity Image Connected Component Analysis (CCA) and Labeling
@@ -252,13 +283,13 @@ int main(int argc, char *argv[])
     ip.RemoveSmallRegion(imgIbinary, imgIbfilter, smallregion); //CCA Filtering (Problem: It's inefficient to run CCA twice. Improve the codes later.)
 
     //5.3.2. Morphological Operations: Dilation and Closing (Optional)
-    Mat element = getStructuringElement(MORPH_RECT, Size(3, 3));
-    morphologyEx(imgIbfilter, closeImg, MORPH_CLOSE, element);
-		//dilate(imgIbfilter, dilateImg, Mat(),element);
+    // Mat element = getStructuringElement(MORPH_RECT, Size(3, 3));
+    // morphologyEx(imgIbfilter, closeImg, MORPH_CLOSE, element);
+    // dilate(imgIbfilter, dilateImg, dilate_element);
 		//erode(dilateImg, closeImg, Mat());  // ->closeImg
 
     // filling the hole
-    Timg = closeImg;
+    Timg = imgIbfilter;
     // Timg = imgIbinary;
     //ip.Truncate(imgIbfilter, Timg); //may encounter some problem (OpenCV Error: Assertion failed)
     ip.ImgFilling(Timg, imgFilled, io.paralist.HC); //Filling the holes inside the markings (Optional)

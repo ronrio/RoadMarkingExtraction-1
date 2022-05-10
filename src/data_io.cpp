@@ -413,16 +413,19 @@ namespace roadmarking
 		for (int i = 0; i < pointCloud->points.size(); i++)
 		{
 			float iAvg = 0.5;
-			if (pointCloud->points[i].intensity >= iAvg) // e.g. remove all pts below iAvg
+			//TODO: Differentiate in the configuration between Scans with scale of 1 and scale of 255 !!
+			if (pointCloud->points[i].intensity >= iAvg && pointCloud->points[i].intensity < 1.0)  // e.g. remove all pts below iAvg
 			{
 				pointCloud->points[i].intensity *= 100;
-				inliers->indices.push_back(i);
+				// Manual filtering point cloud
+				// inliers->indices.push_back(i);
 			}
 		}
-		extract.setInputCloud(pointCloud);
-		extract.setIndices(inliers);
-		extract.setNegative(false);
-		extract.filter(*pointCloud);
+		// Manual filtering point cloud
+		// extract.setInputCloud(pointCloud);
+		// extract.setIndices(inliers);
+		// extract.setNegative(false);
+		// extract.filter(*pointCloud);
     
 		
 		std::cout << "Loaded Points After filtering: "
