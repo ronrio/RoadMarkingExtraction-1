@@ -4,6 +4,7 @@
 ./sample_data
 ./0015_sync_pcd/*
 ./build
+./sample_data/*
 
 # Prerequisites
 *.d
@@ -45,3 +46,7 @@
 *.jpg
 
 *.cpp.o
+
+
+# Cmake files
+./FindOpenCV.cmake
