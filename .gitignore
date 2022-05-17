@@ -1,0 +1,47 @@
+#Data Folder
+./hope.pcd_out
+./pcds_out
+./sample_data
+./0015_sync_pcd/*
+./build
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# .las
+*.las
+
+#JPG image
+*.jpg
+
+*.cpp.o
