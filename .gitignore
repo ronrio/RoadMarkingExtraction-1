@@ -47,6 +47,5 @@
 
 *.cpp.o
 
-
-# Cmake files
-./FindOpenCV.cmake
+# cmake file
+*.cmake
