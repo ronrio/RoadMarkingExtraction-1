@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     std::string outputFolderPath = argv[2];
     std::string model_path = "./model_pool/models_urban_example/";
     std::string parm_file = "./config/parameter_urban_example.txt";
-    std::string gt_file = "./sample_data/Toronto_samp_2_Habebi.txt";
+    std::string gt_file = "./sample_data/Toronto_samp_2_Habeeebi.txt";
 
     if (argc == 3)
         printf("Model pool path and configuration file are not specified, use the default model pool and parameters.\n");
@@ -193,8 +193,7 @@ int main(int argc, char *argv[])
 
     //Step 4. 3D->2D projection, Generating Projection Image
     Imageprocess ip;
-    ip.savepcgrid(bound_3d_temp, resolution, cloud, gcloud, ngcloud); //get image size and save point indices in each pixel
-
+    ip.savepcgrid(bound_3d_temp, resolution, cloud, gcloud, ngcloud, io.groundTruth.groundTruthVals); //get image size and save point indices in each pixel
     //For better efficiency (without ground segmentation), you can replace gcloud and ngcloud with cloud
     //[0:Original Cloud, 1 : Ground Cloud, 2 : Non - ground Cloud]
     // Image 1
@@ -293,7 +292,7 @@ int main(int argc, char *argv[])
     // Timg = imgIbinary;
     //ip.Truncate(imgIbfilter, Timg); //may encounter some problem (OpenCV Error: Assertion failed)
     ip.ImgFilling(Timg, imgFilled, io.paralist.HC); //Filling the holes inside the markings (Optional)
-
+    // ip.labelMarkingsPC(imgFilled); //Classify marking points
     // Image 11
     //ip.CcaBySeedFill(Timg, labelImg);
     ip.CcaBySeedFill(imgFilled, labelImg); //CCA: Seed filling method with 8 neighbor
@@ -312,6 +311,8 @@ int main(int argc, char *argv[])
     //Step 6. 2D->3D back to point cloud
     //ip.img2pc_g(colorLabelImg, gcloud, outcloud);                //Ground Road Marking Points (All in one)
     ip.img2pclabel_g(labelImg, gcloud, outclouds, resolution / 5); //Ground Road Marking Points (Segmentation) //Elevation filter: the last parameter is set as the dZ threshold for single pixel
+    
+    ip.EvaluateLaneMarkings(imgFilled);
 
     //Use Otsu (Intensity) Method and Statistics Outlier Remover to filter the point cloud
     seg.cloudFilter(outclouds, outcloud_otsu_sor, 256, 10, 2.5); // Three parameters: the first is for the histogram level of Otsu Thresholding , the second is for SOR neighbor number and the third is for SOR std threshold

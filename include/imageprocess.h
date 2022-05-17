@@ -1,7 +1,6 @@
 #ifndef INCLUDE_IMAGE_H
 #define INCLUDE_IMAGE_H
 
-#include "polyfit.h"
 #include "utility.h"
 #include "data_io.h"
 #include <numeric>
@@ -15,13 +14,18 @@
 //boost
 #include <boost/filesystem.hpp>
 
+//ROOT
+#include <TLinearFitter.h>
+#include <TMatrixT.h>
+#include <Math/RootFinder.h>
+#include <Math/Polynomial.h>
+// #include <SpecFuncCephes.h>
 
 //opencv
 #include <opencv2/opencv.hpp>   
 #include <opencv2/highgui/highgui.hpp>
 
 using namespace std;
-using namespace cv;
 
 namespace roadmarking
 {
@@ -29,7 +33,7 @@ namespace roadmarking
 	{
 	  public:
 		struct str{
-		bool operator() ( Point a, Point b ){
+		bool operator() ( cv::Point a, cv::Point b ){
 			if ( a.y != b.y ) 
 				return a.y < b.y;
 			return a.x <= b.x ;
@@ -39,52 +43,54 @@ namespace roadmarking
 		  void pcgrid(Bounds &boundingbox, float resolution);                   
 		  
 		  void savepcgrid(Bounds &boundingbox, float resolution, const pcXYZIPtr &c);   
-		  void savepcgrid(Bounds &boundingbox, float resolution,  pcXYZIPtr &c,  pcXYZIPtr &gc, pcXYZIPtr &ngc);   
-		  void pc2imgI(const pcXYZIPtr &cloud, int whatcloud,  Mat &img, float times_std);         //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud]; //times_std: maxI = meanI+ times_std*stdI
-		  void pc2imgZ(const pcXYZIPtr &cloud, int whatcloud,  Mat &img);                          //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud]
-		  void pc2imgD(const pcXYZIPtr &cloud, int whatcloud,  Mat &img ,float k);                 //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud] k:expected max point number in a pixel
+		  void savepcgrid(Bounds &boundingbox, float resolution,  pcXYZIPtr &c,  pcXYZIPtr &gc, pcXYZIPtr &ngc, vector<int> GT_labels);   
+		  void pc2imgI(const pcXYZIPtr &cloud, int whatcloud,  cv::Mat &img, float times_std);         //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud]; //times_std: maxI = meanI+ times_std*stdI
+		  void pc2imgZ(const pcXYZIPtr &cloud, int whatcloud,  cv::Mat &img);                          //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud]
+		  void pc2imgD(const pcXYZIPtr &cloud, int whatcloud,  cv::Mat &img ,float k);                 //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud] k:expected max cv::Point number in a pixel
 		 
-		  void img2pc_g(const Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr & outcloud);  
-		  void img2pc_c(const Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr & outcloud);  
+		  void img2pc_g(const cv::Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr & outcloud);  
+		  void img2pc_c(const cv::Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr & outcloud);  
 
-		  void img2pclabel_g(const Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ);   
-		  void img2pclabel_c(const Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ); 
+		  void img2pclabel_g(const cv::Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ);   
+		  void img2pclabel_c(const cv::Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ); 
 
-		  Mat Sobelboundary(Mat img0);                                                  //Sobel
+		  cv::Mat Sobelboundary(cv::Mat img0);                                                  //Sobel
 		  
-		  float caculateCurrentEntropy(Mat hist, int threshold);                      
-		  Mat maxEntropySegMentation(Mat inputImage);                                 
-		  Mat ExtractRoadPixelIZD(const Mat & _binI,const Mat & _binZ,const Mat & _binD); //(for MLS)
-		  Mat ExtractRoadPixelIZ (const Mat & _binI,const Mat & _binZ);                   //(for ALS)
+		  float caculateCurrentEntropy(cv::Mat hist, int threshold);                      
+		  cv::Mat maxEntropySegMentation(cv::Mat inputImage);                                 
+		  cv::Mat ExtractRoadPixelIZD(const cv::Mat & _binI,const cv::Mat & _binZ,const cv::Mat & _binD); //(for MLS)
+		  cv::Mat ExtractRoadPixelIZ (const cv::Mat & _binI,const cv::Mat & _binZ);                   //(for ALS)
 
-		  void RemoveSmallRegion(const Mat &_binImg, Mat &_binfilter, int AreaLimit);   
-		  void CcaByTwoPass(const Mat & _binfilterImg, Mat & _labelImg);                
-		  void CcaBySeedFill(const Mat& _binfilterImg, Mat & _lableImg);                
+		  void RemoveSmallRegion(const cv::Mat &_binImg, cv::Mat &_binfilter, int AreaLimit);   
+		  void CcaByTwoPass(const cv::Mat & _binfilterImg, cv::Mat & _labelImg);                
+		  void CcaBySeedFill(const cv::Mat& _binfilterImg, cv::Mat & _lableImg);                
 		  
-		  void ImgReverse(const Mat &img, Mat &img_reverse);                            
-		  void ImgFilling(const Mat &img, Mat &img_fill);
-		  void ImgFilling(const Mat &img, Mat &img_fill, HoughConfig HC);                            
+		  void ImgReverse(const cv::Mat &img, cv::Mat &img_reverse);                            
+		  void ImgFilling(const cv::Mat &img, cv::Mat &img_fill);
+		  void ImgFilling(const cv::Mat &img, cv::Mat &img_fill, HoughConfig HC);                            
 
-		  void LabelColor(const Mat & _labelImg, Mat & _colorImg);                     
-		  Scalar GetRandomColor();                                                      
+		  void LabelColor(const cv::Mat & _labelImg, cv::Mat & _colorImg);                     
+		  cv::Scalar GetRandomColor();                                                      
 
-		  void DetectCornerHarris(const Mat & src, const Mat & colorlabel, Mat & cornershow, Mat & cornerwithimg, int threshold);                                //Harris
-		  void DetectCornerShiTomasi(const Mat & src, const Mat & colorlabel, Mat & cornerwithimg, int minDistance, double mincorenerscore);                     //Shi-Tomasi
+		  void DetectCornerHarris(const cv::Mat & src, const cv::Mat & colorlabel, cv::Mat & cornershow, cv::Mat & cornerwithimg, int threshold);                                //Harris
+		  void DetectCornerShiTomasi(const cv::Mat & src, const cv::Mat & colorlabel, cv::Mat & cornerwithimg, int minDistance, double mincorenerscore);                     //Shi-Tomasi
 
-		  void Truncate( Mat & Img, Mat & TImg);                                   
+		  void Truncate( cv::Mat & Img, cv::Mat & TImg);                                   
 
 		  //Save images
-		  void saveimg(const Mat &ProjI, const Mat &ProjZ, const Mat &ProjD, const Mat &ProjImf, const Mat &GI, const Mat &GZ, const Mat &BZ, const Mat &BD, const Mat &GIR, const Mat &BI, const Mat &BIF, const Mat &Label, const Mat &Corner);
-		  void saveimg(std::string base_folder, int file_index, const Mat &ProjI, const Mat &ProjZ, const Mat &ProjImf, const Mat &GI, const Mat &GZ, const Mat &BZ, const Mat &GIR, const Mat &BI, const Mat &BIF, const Mat &Label);
-		  void saveimg(std::string base_folder, int file_index, const Mat &ProjI, const Mat &ProjZ, const Mat &ProjD, const Mat &ProjImf, const Mat &GI, const Mat &GZ, const Mat &BZ, const Mat &BD, const Mat &GIR, const Mat &BI, const Mat &BIF, const Mat &Label); 
-		  void saveimg(const Mat &ProjI, const Mat &ProjImf, const Mat &GI, const Mat &BI, const Mat &BIF, const Mat &Label);
+		  void saveimg(const cv::Mat &ProjI, const cv::Mat &ProjZ, const cv::Mat &ProjD, const cv::Mat &ProjImf, const cv::Mat &GI, const cv::Mat &GZ, const cv::Mat &BZ, const cv::Mat &BD, const cv::Mat &GIR, const cv::Mat &BI, const cv::Mat &BIF, const cv::Mat &Label, const cv::Mat &Corner);
+		  void saveimg(std::string base_folder, int file_index, const cv::Mat &ProjI, const cv::Mat &ProjZ, const cv::Mat &ProjImf, const cv::Mat &GI, const cv::Mat &GZ, const cv::Mat &BZ, const cv::Mat &GIR, const cv::Mat &BI, const cv::Mat &BIF, const cv::Mat &Label);
+		  void saveimg(std::string base_folder, int file_index, const cv::Mat &ProjI, const cv::Mat &ProjZ, const cv::Mat &ProjD, const cv::Mat &ProjImf, const cv::Mat &GI, const cv::Mat &GZ, const cv::Mat &BZ, const cv::Mat &BD, const cv::Mat &GIR, const cv::Mat &BI, const cv::Mat &BIF, const cv::Mat &Label); 
+		  void saveimg(const cv::Mat &ProjI, const cv::Mat &ProjImf, const cv::Mat &GI, const cv::Mat &BI, const cv::Mat &BIF, const cv::Mat &Label);
 
 		  //Get the transformation
-		  void applyPrespectiveTransform(const Mat &img, Bounds& bounds);
+		  void applyPrespectiveTransform(const cv::Mat &img, Bounds& bounds);
 
 		  // Extract Pixel indices for polynomial fitting
-		  vector<vector<Point>> getNonZeroIdx(vector<Vec2f> houghLines, Mat img_h, int off_y, int off_x);
+		  vector<vector<cv::Point>> getNonZeroIdx(vector<cv::Vec2f> houghLines, cv::Mat img_h, int off_y, int off_x);
 
+		  // Label PC in Filttered intensity image 2 for marking and 0 eitherwise
+		  void EvaluateLaneMarkings(const cv::Mat & imgFilled);
 		  int nx, ny; //pixel number
 		  int timin, tjmin; //truncated pixel no.
 		  float minX, minY, minZ;  //bounding box minimum value
@@ -92,6 +98,8 @@ namespace roadmarking
 		  vector<vector<vector<int>>> CMatrixIndice;    //cloud
 		  vector<vector<vector<int>>> GCMatrixIndice;   //ground cloud
 		  vector<vector<vector<int>>> NGCMatrixIndice;  //non-ground cloud
+		  vector<vector<vector<int>>> CMatrixIndiceWithGT; //ground truth labels for the point cloud
+		  vector<vector<vector<int>>> CMatrixIndiceWithPred; //ground truth labels for the point cloud
 		  int totallabel; 
 		  vector<vector <int>>  labelx;  
 		  vector<vector <int>>  labely;  
@@ -99,16 +107,16 @@ namespace roadmarking
 		protected:
 	
 		private:
-			void visualizeIntensityHistogram(const Mat & imgI);
-			void intensityLineSegmentDetector(const Mat & imgI);
-			vector<Vec2f> intensityHoughLineDetector(const Mat & imgI, HoughConfig HC);
-			void visualizeHoughResults(const Mat &img, const string & condition, const vector<Vec2f> & lines, int marking_width);
-			Mat generateHoughMask(const Mat &img, const vector<Vec2f> & lines, int marking_width);
-			void testPolyFit(const Mat &img, vector<Point> lane_idx);
-			vector<Point> returnHoughWindowContour(const Size& imgBounds, const Vec2f & line, const size_t & houghWinOffset);
-			vector<Point> calcLineToImgBounds(const Size& imgBounds, const Vec2f & line);
-			vector<Point> returnHoughLineBound(const Size& imgBounds, const Vec2f &line, int window_width);
-			Mat rotateFrame(Mat img, const Vec2f & trajectory_line, const size_t & num_line);			
+			void visualizeIntensityHistogram(const cv::Mat & imgI);
+			void intensityLineSegmentDetector(const cv::Mat & imgI);
+			vector<cv::Vec2f> intensityHoughLineDetector(const cv::Mat & imgI, HoughConfig HC);
+			void visualizeHoughResults(const cv::Mat &img, const string & condition, const vector<cv::Vec2f> & lines, int marking_width);
+			cv::Mat generateHoughMask(const cv::Mat &img, const vector<cv::Vec2f> & lines, int marking_width);
+			void testPolyFit(const cv::Mat &img, vector<cv::Point> lane_idx);
+			vector<cv::Point> returnHoughWindowContour(const cv::Size& imgBounds, const cv::Vec2f & line, const size_t & houghWinOffset);
+			vector<cv::Point> calcLineToImgBounds(const cv::Size& imgBounds, const cv::Vec2f & line);
+			vector<cv::Point> returnHoughLineBound(const cv::Size& imgBounds, const cv::Vec2f &line, int window_width);
+			cv::Mat rotateFrame(cv::Mat img, vector<cv::Vec2f> & houghLines);			
 			// Re-ordering the contor
 			template< class T >
 			void reorder(vector<T> &v, vector<size_t> const &order )  {   
@@ -117,6 +125,18 @@ namespace roadmarking
 					if ( d == s ) while ( d = order[d], d != s ) swap( v[s], v[d] );
 				}
 			}
+			template <typename T>
+			std::vector<T> linspace(T a, T b, size_t N) {
+				T h = (b - a) / static_cast<T>(N-1);
+				std::vector<T> xs(N);
+				typename std::vector<T>::iterator x;
+				T val;
+				for (x = xs.begin(), val = a; x != xs.end(); ++x, val += h)
+					*x = val;
+				return xs;
+			}
+			vector<cv::Point> robustFitting(vector<cv::Point>, cv::Size img_bounds);
+			// vector<cv::Vec2f> adjustLines(const vector<Vec2f> &houghLines, const double& rot_angle);
 
 	};
 

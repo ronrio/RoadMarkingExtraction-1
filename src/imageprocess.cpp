@@ -1,7 +1,6 @@
 #include "imageprocess.h"
 
 using namespace std;
-using namespace cv;
 
 namespace roadmarking
 {
@@ -24,10 +23,10 @@ namespace roadmarking
 
 		res = resolution;
 
-		cout << "Image Size: " << nx << " * " << ny << endl;
+		cout << "Image cv::Size: " << nx << " * " << ny << endl;
 	}
 
-	void Imageprocess::savepcgrid(Bounds &boundingbox, float resolution, pcXYZIPtr &c, pcXYZIPtr &gc, pcXYZIPtr &ngc)
+	void Imageprocess::savepcgrid(Bounds &boundingbox, float resolution, pcXYZIPtr &c, pcXYZIPtr &gc, pcXYZIPtr &ngc, vector<int> GT)
 	{
 		float lx, ly, lz;
 		int ix, iy;
@@ -45,19 +44,20 @@ namespace roadmarking
 		nx = lx / resolution + 1;
 		ny = ly / resolution + 1;
 
-		cout << "Image Size: " << nx << " x " << ny << endl;
+		cout << "Image cv::Size: " << nx << " x " << ny << endl;
 
 		if(nx * ny > 2e7)
 			cout<<"Warning: Too much grid map, the system may run out of memory."<<endl;
 
 		CMatrixIndice.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
-
-		//Saving point indices 
+		CMatrixIndiceWithGT.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
+		//Saving cv::Point indices 
 		for (int i = 0; i < c->points.size(); i++)
 		{
 			ix = (int)((c->points[i].x - minX) / resolution);
 			iy = (int)((c->points[i].y - minY) / resolution);
 			CMatrixIndice[ix][iy].push_back(i);
+			CMatrixIndiceWithGT[ix][iy].push_back(GT[i]); //Labels are saved the same order as the PC
 		}
         c.reset(new pcXYZI()); //free the memory
         
@@ -95,7 +95,7 @@ namespace roadmarking
 
 		res = resolution;
 
-		cout << "Image Size: " << nx << " * " << ny << endl;
+		cout << "Image cv::Size: " << nx << " * " << ny << endl;
 
 		CMatrixIndice.resize(nx);
 
@@ -104,7 +104,7 @@ namespace roadmarking
 			CMatrixIndice[i].resize(ny);
 		}
 
-		//Saving point indices 
+		//Saving cv::Point indices 
 		for (size_t i = 0; i < c->points.size(); i++)
 		{
 			ix = (c->points[i].x - minX) / res;
@@ -113,7 +113,7 @@ namespace roadmarking
 		}
 	}
 
-	void Imageprocess::pc2imgI(const pcXYZIPtr &cloud, int whatcloud, Mat &img, float times_std)
+	void Imageprocess::pc2imgI(const pcXYZIPtr &cloud, int whatcloud, cv::Mat &img, float times_std)
 	{
 
 		double mini, maxi;	//min and max Intensity
@@ -146,7 +146,7 @@ namespace roadmarking
 
 		switch (whatcloud)
 		{
-		case 0: //Original Point Cloud
+		case 0: //Original cv::Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
@@ -156,7 +156,7 @@ namespace roadmarking
 				}
 			}
 			break;
-		case 1: //Ground Point Cloud
+		case 1: //Ground cv::Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
@@ -178,7 +178,7 @@ namespace roadmarking
 			cout << "Minimum number of PC per cell : " << min_per_cell << endl;
 			cout << "====================================" << endl;
 			break;
-		case 2: //Non-Ground Point Cloud
+		case 2: //Non-Ground cv::Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
@@ -203,8 +203,8 @@ namespace roadmarking
 		//Initialize m
 		double minVal; 
 		double maxVal; 
-		Point minLoc; 
-		Point maxLoc;
+		cv::Point minLoc; 
+		cv::Point maxLoc;
 
 		for(int i=0; i<matIntensities.rows; ++i)
 			for(int j=0; j<matIntensities.cols; ++j)
@@ -213,8 +213,8 @@ namespace roadmarking
 		minMaxLoc(matIntensities, &minVal, &maxVal, &minLoc, &maxLoc );
 		cout << "Min Val of intensities: " << minVal << endl;
 		cout << "Max Val of intensities: " << maxVal << endl;
-		resize(matIntensities, matIntensities, Size(), 0.75, 0.75, INTER_LINEAR);
-		// imshow("Intensity Image Plot ", matIntensities);
+		resize(matIntensities, matIntensities, cv::Size(), 0.75, 0.75, cv::INTER_LINEAR);
+		// cv::imshow("Intensity Image Plot ", matIntensities);
 
 		for (int i = 0; i < nx; i++)
 		{
@@ -260,12 +260,12 @@ namespace roadmarking
 				img.at<uchar>(i, j) = 255 * ave[i][j] / maxi ;
 			}
 		}
-		// imshow("Intensity image after scaling", img);
+		// cv::imshow("Intensity image after scaling", img);
 		// visualizeIntensityHistogram(img);
-		// waitKey();
+		// cv::waitKey();
 	}
 
-	void Imageprocess::pc2imgZ(const pcXYZIPtr &cloud, int whatcloud, Mat &img)
+	void Imageprocess::pc2imgZ(const pcXYZIPtr &cloud, int whatcloud, cv::Mat &img)
 	{
 
 		float minaz, maxaz;			 
@@ -291,7 +291,7 @@ namespace roadmarking
 
 		switch (whatcloud)
 		{
-		case 0: //Original Point Cloud
+		case 0: //Original cv::Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
@@ -301,7 +301,7 @@ namespace roadmarking
 				}
 			}
 			break;
-		case 1: //Ground Point Cloud
+		case 1: //Ground cv::Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
@@ -311,7 +311,7 @@ namespace roadmarking
 				}
 			}
 			break;
-		case 2: //Non-Ground Point Cloud
+		case 2: //Non-Ground cv::Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
@@ -345,7 +345,7 @@ namespace roadmarking
 		}
 	}
 
-	void Imageprocess::pc2imgD(const pcXYZIPtr &cloud, int whatcloud, Mat &img, float expected_max_point_num_in_a_pixel)
+	void Imageprocess::pc2imgD(const pcXYZIPtr &cloud, int whatcloud, cv::Mat &img, float expected_max_point_num_in_a_pixel)
 	{
 
 		img.create(nx, ny, CV_8UC1); 
@@ -356,21 +356,21 @@ namespace roadmarking
 
 		switch (whatcloud)
 		{
-		case 0: //Original Point Cloud
+		case 0: //Original cv::Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
 					Matrixnum(i, j) = CMatrixIndice[i][j].size();
 			}
 			break;
-		case 1: //Ground Point Cloud
+		case 1: //Ground cv::Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
 					Matrixnum(i, j) = GCMatrixIndice[i][j].size();
 			}
 			break;
-		case 2: //Non-Ground Point Cloud
+		case 2: //Non-Ground cv::Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
@@ -384,7 +384,7 @@ namespace roadmarking
 		//else maxnum = expectedmaxnum;
 		maxnum = expected_max_point_num_in_a_pixel;
 
-		cout << "max point number: "<<maxnum<<endl;
+		cout << "max cv::Point number: "<<maxnum<<endl;
 		for (size_t i = 0; i < nx; i++)
 		{
 			for (size_t j = 0; j < ny; j++)
@@ -399,12 +399,12 @@ namespace roadmarking
 		}
 	}
 
-	void Imageprocess::img2pc_g(const Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr &outcloud)
+	void Imageprocess::img2pc_g(const cv::Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr &outcloud)
 	{
 
-		Mat grayImage, binImage;
-		cvtColor(img, grayImage, COLOR_BGR2GRAY);
-		threshold(grayImage, binImage, 0, 1, THRESH_BINARY);
+		cv::Mat grayImage, binImage;
+		cv::cvtColor(img, grayImage, cv::COLOR_BGR2GRAY);
+		threshold(grayImage, binImage, 0, 1, cv::THRESH_BINARY);
 
 		for (size_t i = timin; i < timin + img.rows; i++)
 		{
@@ -419,12 +419,12 @@ namespace roadmarking
 		}
 	}
 
-	void Imageprocess::img2pc_c(const Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr &outcloud)
+	void Imageprocess::img2pc_c(const cv::Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr &outcloud)
 	{
 
-		Mat grayImage, binImage;
-		cvtColor(img, grayImage, COLOR_BGR2GRAY);
-		threshold(grayImage, binImage, 0, 1, THRESH_BINARY);
+		cv::Mat grayImage, binImage;
+		cv::cvtColor(img, grayImage, cv::COLOR_BGR2GRAY);
+		threshold(grayImage, binImage, 0, 1, cv::THRESH_BINARY);
 
 		for (size_t i = timin; i < timin + img.rows; i++)
 		{
@@ -439,7 +439,7 @@ namespace roadmarking
 		}
 	}
 
-	void Imageprocess::img2pclabel_g(const Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ)
+	void Imageprocess::img2pclabel_g(const cv::Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ)
 	{
 		int classNo = 0;
 
@@ -492,7 +492,7 @@ namespace roadmarking
 		//cout << "Cloud Number: " << classNo << endl;
 	}
 
-	void Imageprocess::img2pclabel_c(const Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ)
+	void Imageprocess::img2pclabel_c(const cv::Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ)
 	{
 		int classNo = 0;
 
@@ -542,22 +542,22 @@ namespace roadmarking
 		cout << "Cloud Number: " << classNo << endl;
 	}
 
-	Mat Imageprocess::Sobelboundary(Mat img0)
+	cv::Mat Imageprocess::Sobelboundary(cv::Mat img0)
 	{
 		//Using Sobel Operation
-		Mat grad_xg, grad_yg, abs_grad_xg, abs_grad_yg, dstg;
+		cv::Mat grad_xg, grad_yg, abs_grad_xg, abs_grad_yg, dstg;
 
-		Sobel(img0, grad_xg, CV_16S, 1, 0, 3, 1, 1, BORDER_DEFAULT);
+		Sobel(img0, grad_xg, CV_16S, 1, 0, 3, 1, 1, cv::BORDER_DEFAULT);
 		convertScaleAbs(grad_xg, abs_grad_xg);
 
-		Sobel(img0, grad_yg, CV_16S, 0, 1, 3, 1, 1, BORDER_DEFAULT);
+		Sobel(img0, grad_yg, CV_16S, 0, 1, 3, 1, 1, cv::BORDER_DEFAULT);
 		convertScaleAbs(grad_yg, abs_grad_yg);
 
 		addWeighted(abs_grad_xg, 0.5, abs_grad_yg, 0.5, 0, dstg);
 		return dstg;
 	}
 
-	float Imageprocess::caculateCurrentEntropy(Mat hist, int threshold)
+	float Imageprocess::caculateCurrentEntropy(cv::Mat hist, int threshold)
 	{
 		float BackgroundSum = 0, targetSum = 0;
 		const float *pDataHist = (float *)hist.ptr<float>(0);
@@ -589,7 +589,7 @@ namespace roadmarking
 		return (targetEntropy + BackgroundEntropy); 
 	}
 
-	Mat Imageprocess::maxEntropySegMentation(Mat inputImage)
+	cv::Mat Imageprocess::maxEntropySegMentation(cv::Mat inputImage)
 	{
 		// Max Entropy Binarization
 		// Using the distribution of histogram to calculate the threshold leading to the max entropy.
@@ -597,11 +597,11 @@ namespace roadmarking
 		const int histSize[1] = {256};
 		float pranges[2] = {0, 256};
 		const float *ranges[1] = {pranges};
-		MatND hist; // No difference to the normal Mat constructor and is about to be absolote
-		calcHist(&inputImage, 1, channels, Mat(), hist, 1, histSize, ranges);
+		cv::MatND hist; // No difference to the normal cv::Mat constructor and is about to be absolote
+		cv::calcHist(&inputImage, 1, channels, cv::Mat(), hist, 1, histSize, ranges);
 		float maxentropy = 0;
 		int max_index = 0;
-		Mat result;
+		cv::Mat result;
 		for (int i = 0; i < 256; i++) 
 		{
 			float cur_entropy = caculateCurrentEntropy(hist, i);
@@ -611,13 +611,13 @@ namespace roadmarking
 				max_index = i;
 			}
 		}
-		threshold(inputImage, result, max_index, 1, THRESH_BINARY); // > max_index assign as 1   < max_index assign as 0
+		threshold(inputImage, result, max_index, 1, cv::THRESH_BINARY); // > max_index assign as 1   < max_index assign as 0
 		return result;
 	}
 
-	Mat Imageprocess::ExtractRoadPixelIZD(const Mat &_imgI, const Mat &_binZ, const Mat &_binD)
+	cv::Mat Imageprocess::ExtractRoadPixelIZD(const cv::Mat &_imgI, const cv::Mat &_binZ, const cv::Mat &_binD)
 	{
-		Mat result;
+		cv::Mat result;
 		_imgI.convertTo(result, CV_8UC1);
 		//int mini, minj, maxi, maxj;
 		//vector <int> arrayi, arrayj;
@@ -637,9 +637,9 @@ namespace roadmarking
 		}
 		return result;
 	}
-	Mat Imageprocess::ExtractRoadPixelIZ(const Mat &_imgI, const Mat &_binZ)
+	cv::Mat Imageprocess::ExtractRoadPixelIZ(const cv::Mat &_imgI, const cv::Mat &_binZ)
 	{
-		Mat result;
+		cv::Mat result;
 		_imgI.convertTo(result, CV_8UC1);
 		for (int i = 0; i < _imgI.rows; i++)
 		{
@@ -657,7 +657,7 @@ namespace roadmarking
 		}
 		return result;
 	}
-	void Imageprocess::CcaByTwoPass(const Mat &_binImg, Mat &_labelImg)
+	void Imageprocess::CcaByTwoPass(const cv::Mat &_binImg, cv::Mat &_labelImg)
 	{
 		// connected component analysis (8-component)
 		// use two-pass algorithm 
@@ -768,7 +768,7 @@ namespace roadmarking
 		//cout << "Number label: " << totallabel << endl;
 	}
 
-	void Imageprocess::CcaBySeedFill(const Mat &_binImg, Mat &_lableImg)
+	void Imageprocess::CcaBySeedFill(const cv::Mat &_binImg, cv::Mat &_lableImg)
 	{
 		// connected component analysis (8-component)
 		// use seed filling algorithm
@@ -858,13 +858,13 @@ namespace roadmarking
 		totallabel = label;
 	}
 
-	void Imageprocess::RemoveSmallRegion(const Mat &Src, Mat &Dst, int AreaLimit)
+	void Imageprocess::RemoveSmallRegion(const cv::Mat &Src, cv::Mat &Dst, int AreaLimit)
 	{
 		int RemoveCount = 0;
 		Src.convertTo(Dst, CV_8UC1);
 		int CheckMode = 1;	 
 		int NeihborMode = 1; 
-		Mat PointLabel = Mat::zeros(Src.size(), CV_8UC1);
+		cv::Mat PointLabel = cv::Mat::zeros(Src.size(), CV_8UC1);
 		if (CheckMode == 1) 
 		{
 			for (int i = 0; i < Src.rows; i++)
@@ -888,17 +888,17 @@ namespace roadmarking
 			}
 		}
 
-		vector<Point2i> NeihborPos;
-		NeihborPos.push_back(Point2i(-1, 0));
-		NeihborPos.push_back(Point2i(1, 0));
-		NeihborPos.push_back(Point2i(0, -1));
-		NeihborPos.push_back(Point2i(0, 1));
+		vector<cv::Point2i> NeihborPos;
+		NeihborPos.push_back(cv::Point2i(-1, 0));
+		NeihborPos.push_back(cv::Point2i(1, 0));
+		NeihborPos.push_back(cv::Point2i(0, -1));
+		NeihborPos.push_back(cv::Point2i(0, 1));
 		if (NeihborMode == 1)
 		{
-			NeihborPos.push_back(Point2i(-1, -1));
-			NeihborPos.push_back(Point2i(-1, 1));
-			NeihborPos.push_back(Point2i(1, -1));
-			NeihborPos.push_back(Point2i(1, 1));
+			NeihborPos.push_back(cv::Point2i(-1, -1));
+			NeihborPos.push_back(cv::Point2i(-1, 1));
+			NeihborPos.push_back(cv::Point2i(1, -1));
+			NeihborPos.push_back(cv::Point2i(1, 1));
 		}
 		else
 			int a = 0; 
@@ -910,8 +910,8 @@ namespace roadmarking
 			{
 				if (PointLabel.at<uchar>(i, j) == 0) 
 				{									
-					vector<Point2i> GrowBuffer;		 
-					GrowBuffer.push_back(Point2i(j, i));
+					vector<cv::Point2i> GrowBuffer;		 
+					GrowBuffer.push_back(cv::Point2i(j, i));
 					PointLabel.at<uchar>(i, j) = 1;
 					int CheckResult = 0;
 
@@ -925,7 +925,7 @@ namespace roadmarking
 							{
 								if (PointLabel.at<uchar>(CurrY, CurrX) == 0)
 								{
-									GrowBuffer.push_back(Point2i(CurrX, CurrY)); 
+									GrowBuffer.push_back(cv::Point2i(CurrX, CurrY)); 
 									PointLabel.at<uchar>(CurrY, CurrX) = 1;		
 								}
 							}
@@ -964,15 +964,15 @@ namespace roadmarking
 		}
 	}
 
-	Scalar Imageprocess::GetRandomColor()
+	cv::Scalar Imageprocess::GetRandomColor()
 	{
 		uchar r = 255 * (rand() / (1.0 + RAND_MAX)); // rand() / (1.0+ RAND_MAX) : a random float number between 0 and 1 (can't be equal to 1)
 		uchar g = 255 * (rand() / (1.0 + RAND_MAX)); 
 		uchar b = 255 * (rand() / (1.0 + RAND_MAX));
-		return Scalar(b, g, r);
+		return cv::Scalar(b, g, r);
 	}
 
-	void Imageprocess::LabelColor(const Mat &_labelImg, Mat &_colorLabelImg)
+	void Imageprocess::LabelColor(const cv::Mat &_labelImg, cv::Mat &_colorLabelImg)
 	{
 		if (_labelImg.empty() ||
 			_labelImg.type() != CV_32SC1)
@@ -980,14 +980,14 @@ namespace roadmarking
 			return;
 		}
 
-		std::map<int, Scalar> colors;
+		std::map<int, cv::Scalar> colors;
 
 		int rows = _labelImg.rows;
 		int cols = _labelImg.cols;
 
 		_colorLabelImg.release();
 		_colorLabelImg.create(rows, cols, CV_8UC3);
-		_colorLabelImg = Scalar::all(0);
+		_colorLabelImg = cv::Scalar::all(0);
 
 		for (int i = 0; i < rows; i++)
 		{
@@ -1006,7 +1006,7 @@ namespace roadmarking
 					{
 						colors[pixelValue] = GetRandomColor();
 					}
-					Scalar color = colors[pixelValue];
+					cv::Scalar color = colors[pixelValue];
 					*data_dst++ = color[0];
 					*data_dst++ = color[1];
 					*data_dst++ = color[2];
@@ -1020,7 +1020,7 @@ namespace roadmarking
 			}
 		}
 	}
-	void Imageprocess::Truncate(Mat &Img, Mat &TruncatedImg)
+	void Imageprocess::Truncate(cv::Mat &Img, cv::Mat &TruncatedImg)
 	{
 		int mini, minj, maxi, maxj, di, dj;
 		mini = INT_MAX;
@@ -1075,16 +1075,16 @@ namespace roadmarking
 
 		//cout << "X: " << tjmin << "  Y: " << timin << "  dX: " << dj << "  dY: " << di<< endl;
 
-		//imshow("Truncated", 255*TruncatedImg);
+		//cv::imshow("Truncated", 255*TruncatedImg);
 	}
 
-	void Imageprocess::DetectCornerHarris(const Mat &src, const Mat &colorlabel, Mat &cornershow, Mat &cornerwithimg, int threshold)
+	void Imageprocess::DetectCornerHarris(const cv::Mat &src, const cv::Mat &colorlabel, cv::Mat &cornershow, cv::Mat &cornerwithimg, int threshold)
 	{
-		Mat corner, corner8u, imageGray;
+		cv::Mat corner, corner8u, imageGray;
 		src.convertTo(imageGray, CV_8UC1);
-		corner = Mat::zeros(src.size(), CV_32FC1);
-		cornerHarris(imageGray, corner, 3, 3, 0.04, BORDER_DEFAULT);
-		normalize(corner, corner8u, 0, 255, NORM_MINMAX); 
+		corner = cv::Mat::zeros(src.size(), CV_32FC1);
+		cv::cornerHarris(imageGray, corner, 3, 3, 0.04, cv::BORDER_DEFAULT);
+		cv::normalize(corner, corner8u, 0, 255, cv::NORM_MINMAX); 
 		convertScaleAbs(corner8u, cornershow);
 		cornerwithimg = colorlabel.clone();
 		for (int i = 0; i < src.rows; i++)
@@ -1093,12 +1093,12 @@ namespace roadmarking
 			{
 				if (cornershow.at<uchar>(i, j) > threshold)
 				{
-					circle(cornerwithimg, Point(j, i), 2, Scalar(255, 255, 255), 2); 
+					cv::circle(cornerwithimg, cv::Point(j, i), 2, cv::Scalar(255, 255, 255), 2); 
 				}
 			}
 		}
 	}
-	void Imageprocess::ImgReverse(const Mat &img, Mat &img_reverse)
+	void Imageprocess::ImgReverse(const cv::Mat &img, cv::Mat &img_reverse)
 	{
 		img.convertTo(img_reverse, CV_8UC1);
 
@@ -1112,13 +1112,13 @@ namespace roadmarking
 					img_reverse.at<uchar>(i, j) = 1;
 			}
 		}
-		//imshow("imgReverse", 255*img_reverse);
+		//cv::imshow("imgReverse", 255*img_reverse);
 	}
-	void Imageprocess::ImgFilling(const Mat &img, Mat &img_fill)
+	void Imageprocess::ImgFilling(const cv::Mat &img, cv::Mat &img_fill)
 	{
 		img.convertTo(img_fill, CV_8UC1);
 
-		Mat img_reverse, img_reverse_label;
+		cv::Mat img_reverse, img_reverse_label;
 		//threshold(img, img_reverse, 1, 1, CV_THRESH_BINARY);
 		ImgReverse(img, img_reverse);
 		CcaBySeedFill(img_reverse, img_reverse_label);
@@ -1133,16 +1133,16 @@ namespace roadmarking
 			}
 		}
 
-		// imshow("imgfill", 255 * img_fill);
-		// waitKey();
+		// cv::imshow("imgfill", 255 * img_fill);
+		// cv::waitKey();
 		// intensityLineSegmentDetector(255 * img_fill);
 	}
 
-	void Imageprocess::ImgFilling(const Mat &img, Mat &img_fill, HoughConfig HC)
+	void Imageprocess::ImgFilling(const cv::Mat &img, cv::Mat &img_fill, HoughConfig HC)
 	{
 		img.convertTo(img_fill, CV_8UC1);
 
-		Mat img_reverse, img_reverse_label;
+		cv::Mat img_reverse, img_reverse_label;
 		//threshold(img, img_reverse, 1, 1, CV_THRESH_BINARY);
 		ImgReverse(img, img_reverse);
 		CcaBySeedFill(img_reverse, img_reverse_label);
@@ -1157,30 +1157,23 @@ namespace roadmarking
 			}
 		}
 
-		vector<Vec2f> houghLines = intensityHoughLineDetector(255 * img_fill,HC);
+		vector<cv::Vec2f> houghLines = intensityHoughLineDetector(255 * img_fill,HC);
 
 		// Transform the image into a horizontal Orientation
-		Vec2f trajectory_line = houghLines[0];
-		int off_y = 30, off_x = 5;
-		Mat img_h;
-		cout << "Vehicle trajectory line : " << trajectory_line << endl;
-		img_h = rotateFrame(255 * img_fill, trajectory_line, 0);
-		
-		// Only line instances should be rotated
-		houghLines = intensityHoughLineDetector(img_h,HC);
-		vector<vector<Point>> polyList_idx = getNonZeroIdx(houghLines, img_h, off_y, off_x);
+		cv::Vec2f trajectory_line = houghLines[0];
+		int off_y = 10, off_x = 5;
+		cv::Mat img_h;
+		cout << "Vehicle trajectory cv::line : " << trajectory_line << endl;
 
-		// //fit polynomial to per line
-		// for(size_t line_i = 0; polyList_idx.size(); line_i++){
-		// 	testPolyFit(img_h, polyList_idx[line_i]);
-		// }
+		img_h = rotateFrame(255 * img_fill, houghLines);
+		vector<vector<cv::Point>> polyList_idx = getNonZeroIdx(houghLines, img_h, off_y, off_x);
 	}
 
-	void Imageprocess::DetectCornerShiTomasi(const Mat &src, const Mat &colorlabel, Mat &cornerwithimg, int minDistance, double qualityLevel)
+	void Imageprocess::DetectCornerShiTomasi(const cv::Mat &src, const cv::Mat &colorlabel, cv::Mat &cornerwithimg, int minDistance, double qualityLevel)
 	{
-		Mat imageGray;
+		cv::Mat imageGray;
 		src.convertTo(imageGray, CV_8UC1);
-		vector<Point2f> corners;
+		vector<cv::Point2f> corners;
 		int maxCorners = INT_MAX;
 		int blockSize = 3;
 		bool useHarrisDetector = false;
@@ -1188,37 +1181,37 @@ namespace roadmarking
 
 		cornerwithimg = colorlabel.clone();
 		/// Apply corner detection :Determines strong corners on an image.
-		goodFeaturesToTrack(imageGray, corners, maxCorners, qualityLevel, minDistance, Mat(), blockSize, useHarrisDetector, k);
+		cv::goodFeaturesToTrack(imageGray, corners, maxCorners, qualityLevel, minDistance, cv::Mat(), blockSize, useHarrisDetector, k);
 
 		// Draw corners detected
 		for (int i = 0; i < corners.size(); i++)
 		{
-			circle(cornerwithimg, corners[i], 3, Scalar(255, 255, 255), 1, 8, 0);
+			cv::circle(cornerwithimg, corners[i], 3, cv::Scalar(255, 255, 255), 1, 8, 0);
 		}
 	}
 
-	void Imageprocess::saveimg(const Mat &ProjI, const Mat &ProjZ, const Mat &ProjD, const Mat &ProjImf, const Mat &GI, const Mat &GZ, const Mat &BZ, const Mat &BD, const Mat &GIR, const Mat &BI, const Mat &BIF, const Mat &Label, const Mat &Corner)
+	void Imageprocess::saveimg(const cv::Mat &ProjI, const cv::Mat &ProjZ, const cv::Mat &ProjD, const cv::Mat &ProjImf, const cv::Mat &GI, const cv::Mat &GZ, const cv::Mat &BZ, const cv::Mat &BD, const cv::Mat &GIR, const cv::Mat &BI, const cv::Mat &BIF, const cv::Mat &Label, const cv::Mat &Corner)
 	{
 
-		imwrite("1_Intensity Projection Image.jpg", ProjI);
-		imwrite("2_Elevation Projection Image.jpg", ProjZ);
-		imwrite("3_Density Projection Image.jpg", ProjD);
-		imwrite("4_Intensity Projection Image after Median Filter.jpg", ProjImf);
-		imwrite("5_Intensity Gradient Image.jpg", GI);
-		imwrite("6_Slope Image.jpg", GZ);
-		imwrite("7_Slope Binary Image.jpg", 255 * BZ);
-		imwrite("8_Density Binary Image.jpg", 255 * BD);
-		imwrite("9_Road Intensity Gradient Image.jpg", GIR);
-		imwrite("10_Road Intensity Binary Image.jpg", 255 * BI);
-		imwrite("11_CCA Filter Road Intensity Binary Image.jpg", 255 * BIF);
-		imwrite("12_RoadMarkings.jpg", Label);
-		imwrite("13_Marking Corners.jpg", Corner);
+		cv::imwrite("1_Intensity Projection Image.jpg", ProjI);
+		cv::imwrite("2_Elevation Projection Image.jpg", ProjZ);
+		cv::imwrite("3_Density Projection Image.jpg", ProjD);
+		cv::imwrite("4_Intensity Projection Image after Median Filter.jpg", ProjImf);
+		cv::imwrite("5_Intensity Gradient Image.jpg", GI);
+		cv::imwrite("6_Slope Image.jpg", GZ);
+		cv::imwrite("7_Slope Binary Image.jpg", 255 * BZ);
+		cv::imwrite("8_Density Binary Image.jpg", 255 * BD);
+		cv::imwrite("9_Road Intensity Gradient Image.jpg", GIR);
+		cv::imwrite("10_Road Intensity Binary Image.jpg", 255 * BI);
+		cv::imwrite("11_CCA Filter Road Intensity Binary Image.jpg", 255 * BIF);
+		cv::imwrite("12_RoadMarkings.jpg", Label);
+		cv::imwrite("13_Marking Corners.jpg", Corner);
 
 		//cout << "Image Output Done." << endl;
 	}
 
 	void Imageprocess::saveimg(std::string outputFolder,
-							   int file_index, const Mat &ProjI, const Mat &ProjZ, const Mat &ProjD, const Mat &ProjImf, const Mat &GI, const Mat &GZ, const Mat &BZ, const Mat &BD, const Mat &GIR, const Mat &BI, const Mat &BIF, const Mat &Label)
+							   int file_index, const cv::Mat &ProjI, const cv::Mat &ProjZ, const cv::Mat &ProjD, const cv::Mat &ProjImf, const cv::Mat &GI, const cv::Mat &GZ, const cv::Mat &BZ, const cv::Mat &BD, const cv::Mat &GIR, const cv::Mat &BI, const cv::Mat &BIF, const cv::Mat &Label)
 	{
 		
 		if (!boost::filesystem::exists(outputFolder))
@@ -1241,25 +1234,25 @@ namespace roadmarking
 		img11 = outputFolder + "/" + "11_CCA Filter Road Intensity Binary Image.jpg";
 		img12 = outputFolder + "/" + "12_RoadMarkings.jpg";
 
-		imwrite(img1, ProjI);
-		imwrite(img2, ProjZ);
-		imwrite(img3, ProjD);
-		imwrite(img4, ProjImf);
-		imwrite(img5, GI);
-		imwrite(img6, GZ);
-		imwrite(img7, 255 * BZ);
-		imwrite(img8, 255 * BD);
-		imwrite(img9, GIR);
-		imwrite(img10, 255 * BI);
-		imwrite(img11, 255 * BIF);
-		imwrite(img12, Label);
+		cv::imwrite(img1, ProjI);
+		cv::imwrite(img2, ProjZ);
+		cv::imwrite(img3, ProjD);
+		cv::imwrite(img4, ProjImf);
+		cv::imwrite(img5, GI);
+		cv::imwrite(img6, GZ);
+		cv::imwrite(img7, 255 * BZ);
+		cv::imwrite(img8, 255 * BD);
+		cv::imwrite(img9, GIR);
+		cv::imwrite(img10, 255 * BI);
+		cv::imwrite(img11, 255 * BIF);
+		cv::imwrite(img12, Label);
 
 		cout << "Image Output Done." << endl;
 	}
 
 	//hyj0728 without density
 	void Imageprocess::saveimg(std::string outputFolder_base,
-							   int file_index, const Mat &ProjI, const Mat &ProjZ, const Mat &ProjImf, const Mat &GI, const Mat &GZ, const Mat &BZ, const Mat &GIR, const Mat &BI, const Mat &BIF, const Mat &Label)
+							   int file_index, const cv::Mat &ProjI, const cv::Mat &ProjZ, const cv::Mat &ProjImf, const cv::Mat &GI, const cv::Mat &GZ, const cv::Mat &BZ, const cv::Mat &GIR, const cv::Mat &BI, const cv::Mat &BIF, const cv::Mat &Label)
 	{
 		std::string outputFolder;
 
@@ -1295,60 +1288,60 @@ namespace roadmarking
 		img9 = outputFolder + "/" + "9_CCA Filter Road Intensity Binary Image.jpg";
 		img10 = outputFolder + "/" + "10_RoadMarkings.jpg";
 
-		imwrite(img1, ProjI);
-		imwrite(img2, ProjZ);
-		// imwrite(img3, ProjD);
-		imwrite(img3, ProjImf);
-		imwrite(img4, GI);
-		imwrite(img5, GZ);
-		imwrite(img6, 255 * BZ);
-		// imwrite(img8, 255 * BD);
-		imwrite(img7, GIR);
-		imwrite(img8, 255 * BI);
-		imwrite(img9, 255 * BIF);
-		imwrite(img10, Label);
+		cv::imwrite(img1, ProjI);
+		cv::imwrite(img2, ProjZ);
+		// cv::imwrite(img3, ProjD);
+		cv::imwrite(img3, ProjImf);
+		cv::imwrite(img4, GI);
+		cv::imwrite(img5, GZ);
+		cv::imwrite(img6, 255 * BZ);
+		// cv::imwrite(img8, 255 * BD);
+		cv::imwrite(img7, GIR);
+		cv::imwrite(img8, 255 * BI);
+		cv::imwrite(img9, 255 * BIF);
+		cv::imwrite(img10, Label);
 
 		cout << "Image Output Done." << endl;
 	}
 
-	void Imageprocess::saveimg(const Mat &ProjI, const Mat &ProjImf, const Mat &GI, const Mat &BI, const Mat &BIF, const Mat &Label)
+	void Imageprocess::saveimg(const cv::Mat &ProjI, const cv::Mat &ProjImf, const cv::Mat &GI, const cv::Mat &BI, const cv::Mat &BIF, const cv::Mat &Label)
 	{
-		imwrite("1_Intensity Projection Image.jpg", ProjI);
-		imwrite("2_Intensity Projection Image after Median Filter.jpg", ProjImf);
-		imwrite("3_Intensity Gradient Image.jpg", GI);
-		imwrite("4_Road Intensity Binary Image.jpg", 255 * BI);
-		imwrite("5_CCA Filter Road Intensity Binary Image.jpg", 255 * BIF);
-		imwrite("6_RoadMarkings.jpg", Label);
+		cv::imwrite("1_Intensity Projection Image.jpg", ProjI);
+		cv::imwrite("2_Intensity Projection Image after Median Filter.jpg", ProjImf);
+		cv::imwrite("3_Intensity Gradient Image.jpg", GI);
+		cv::imwrite("4_Road Intensity Binary Image.jpg", 255 * BI);
+		cv::imwrite("5_CCA Filter Road Intensity Binary Image.jpg", 255 * BIF);
+		cv::imwrite("6_RoadMarkings.jpg", Label);
 
 		//cout << "Image Output Done." << endl;
 	}
 
-	void Imageprocess::visualizeIntensityHistogram(const Mat &imgI){
+	void Imageprocess::visualizeIntensityHistogram(const cv::Mat &imgI){
 		const int channels[1] = {0};
 		const int histSize[1] = {255};
 		float pranges[2] = {1, 256};
 		const float *ranges[1] = {pranges};
-		Mat hist;
+		cv::Mat hist;
 		int WIDTH = 400, HEIGHT = 400;
 		int bin_w = cvRound( (double) WIDTH/histSize[0]);
-		Mat histImage( HEIGHT, WIDTH, CV_8UC1, Scalar(0)), imgI_down;
+		cv::Mat histImage( HEIGHT, WIDTH, CV_8UC1, cv::Scalar(0)), imgI_down;
 
-		calcHist( &imgI, 1, 0, Mat(), hist, 1, histSize, ranges);
-		normalize(hist, hist, 0, imgI.rows, NORM_MINMAX, -1, Mat() );
+		cv::calcHist( &imgI, 1, 0, cv::Mat(), hist, 1, histSize, ranges);
+		cv::normalize(hist, hist, 0, imgI.rows, cv::NORM_MINMAX, -1, cv::Mat() );
 		for( int i = 1; i < histSize[0]; i++ )
     	{
-        line( histImage, Point( bin_w*(i-1), HEIGHT - cvRound(hist.at<float>(i-1)) ),
-              Point( bin_w*(i), HEIGHT - cvRound(hist.at<float>(i)) ),
-              Scalar(255), 2, 8, 0  );
+        cv::line( histImage, cv::Point( bin_w*(i-1), HEIGHT - cvRound(hist.at<float>(i-1)) ),
+              cv::Point( bin_w*(i), HEIGHT - cvRound(hist.at<float>(i)) ),
+              cv::Scalar(255), 2, 8, 0  );
    		}
 		
 		// Resize the image so we would be able to visualize it
-		resize(imgI, imgI_down, Size(WIDTH, HEIGHT), INTER_LINEAR);
+		cv::resize(imgI, imgI_down, cv::Size(WIDTH, HEIGHT), cv::INTER_LINEAR);
 
-		imwrite("Intensity_scales_hist.png", histImage );
-		waitKey();
+		cv::imwrite("Intensity_scales_hist.png", histImage );
+		cv::waitKey();
 	}
-	void Imageprocess::intensityLineSegmentDetector(const Mat & imgI){
+	void Imageprocess::intensityLineSegmentDetector(const cv::Mat & imgI){
 
     bool useRefine = true;
     bool useCanny = false;
@@ -1356,23 +1349,23 @@ namespace roadmarking
 
     if (useCanny)
     {
-        Canny(imgI, imgI, 50, 200, 3); // Apply Canny edge detector
+        cv::Canny(imgI, imgI, 50, 200, 3); // Apply Canny edge detector
     }
 
     // Create and LSD detector with standard or no refinement.
-    Ptr<LineSegmentDetector> ls = useRefine ? createLineSegmentDetector(LSD_REFINE_ADV) : createLineSegmentDetector(LSD_REFINE_NONE);
+    cv::Ptr<cv::LineSegmentDetector> ls = useRefine ? cv::createLineSegmentDetector(cv::LSD_REFINE_ADV) : cv::createLineSegmentDetector(cv::LSD_REFINE_NONE);
 
-    double start = double(getTickCount());
-    vector<Vec4f> lines_std;
+    double start = double(cv::getTickCount());
+    vector<cv::Vec4f> lines_std;
 	vector<float> width_lines, prec_lines, nfa;
-	Mat imgI_down;
+	cv::Mat imgI_down;
 
 	imgI.convertTo(imgI_down, CV_8UC1);
 
     // Detect the lines
     ls->detect(imgI_down, lines_std, width_lines, prec_lines, nfa);
 
-    double duration_ms = (double(getTickCount()) - start) * 1000 / getTickFrequency();
+    double duration_ms = (double(cv::getTickCount()) - start) * 1000 / cv::getTickFrequency();
     std::cout << "It took " << duration_ms << " ms." << std::endl;
 
 	for (int i = 0; i < lines_std.size(); i++)
@@ -1388,22 +1381,22 @@ namespace roadmarking
     // Show found lines
     if (!overlay || useCanny)
     {
-        imgI_down = Scalar(0);
+        imgI_down = cv::Scalar(0);
     }
 
     ls->drawSegments(imgI_down, lines_std);
 
-    String window_name = useRefine ? "Result - standard refinement" : "Result - no refinement";
+    cv::String window_name = useRefine ? "Result - standard refinement" : "Result - no refinement";
     window_name += useCanny ? " - Canny edge detector used" : "";
 	
-	imwrite("LSD_Intensity_Image.jpg", imgI_down);
+	cv::imwrite("LSD_Intensity_Image.jpg", imgI_down);
 
 	}
 
-	vector<Vec2f> Imageprocess::intensityHoughLineDetector(const Mat & imgI, HoughConfig HC){
+	vector<cv::Vec2f> Imageprocess::intensityHoughLineDetector(const cv::Mat & imgI, HoughConfig HC){
 
-		Mat dst;
-		vector<Vec2f> lines, filtered_lines; // will hold the results of the detection
+		cv::Mat dst;
+		vector<cv::Vec2f> lines, filtered_lines; // will hold the results of the detection
 		float trajectory_ang_rad = HC.trajectory_ang_rad;
 		float fuse_thres = HC.fuse_thres;
 		float fuse_factor = HC.fuse_factor;
@@ -1416,13 +1409,13 @@ namespace roadmarking
 		// Edge detection
 		Canny(imgI, dst, 50, 200, 3);
 		cout << "=========AFTER CANNY=========" << endl;
-		// Standard Hough Line Transform
+		// Standard Hough cv::line Transform
 		HoughLines(dst, lines, rho_res, theta_res * CV_PI/180, vote_thres, 0, 0 ); // runs the actual detection
 		
 		visualizeHoughResults(imgI, "after_hough_detect", lines, HC.marking_width);
 		cout << "=========AFTER HOUGH=========" << endl;
 		// Getting the most dominant theta 
-		map<float,vector<Vec2f>> parallel_dict;
+		map<float,vector<cv::Vec2f>> parallel_dict;
 
 		// Filtering according to the trajectory direction
 			// for( size_t i = 0; i < lines.size(); i++ )
@@ -1441,7 +1434,7 @@ namespace roadmarking
 			parallel_dict[theta_group].push_back(lines[i]);
 		}
 
-		map<float,vector<Vec2f>>::iterator it;
+		map<float,vector<cv::Vec2f>>::iterator it;
 		filtered_lines.clear(); // Store only the most dominent theta group (the angle that has the maximum number of parallal lines)
 		auto max_parallal = parallel_dict.begin()->second.size();
 		float dominantTheta = parallel_dict.begin()->first;
@@ -1472,7 +1465,7 @@ namespace roadmarking
 					{
 						float fused_rho = filtered_lines[i][0] * fuse_factor + filtered_lines[j][0] * (1 - fuse_factor);
 						float fused_theta = filtered_lines[i][1] * fuse_factor + filtered_lines[j][1] * (1 - fuse_factor);
-						Vec2f fused_line = {fused_rho, fused_theta};
+						cv::Vec2f fused_line = {fused_rho, fused_theta};
 						filtered_lines.erase(filtered_lines.begin()+j);
 						filtered_lines.erase(filtered_lines.begin()+i);
 						filtered_lines.push_back(fused_line);
@@ -1489,51 +1482,51 @@ namespace roadmarking
 		return filtered_lines;
 	}
 
-	void Imageprocess::visualizeHoughResults(const Mat &img, const string & condition, const vector<Vec2f> & lines, int marking_width){
+	void Imageprocess::visualizeHoughResults(const cv::Mat &img, const string & condition, const vector<cv::Vec2f> & lines, int marking_width){
 		
-		Mat cdst;
+		cv::Mat cdst;
 
 		// Copy edges to the images that will display the results in BGR
-		cvtColor(img, cdst, COLOR_GRAY2BGR);
+		cv::cvtColor(img, cdst, cv::COLOR_GRAY2BGR);
 
 		//Print the filtered lines
 		std::cout << "Number  of lines " + condition + " : " << lines.size() << std::endl;
 		for( size_t i = 0; i < lines.size(); i++)
 		{
-			cout << "Line # " << i << " : " << lines[i] << endl;
-			vector<Point> lineImgBounds = returnHoughLineBound(img.size(), lines[i], marking_width);
-			Point Pt1 = lineImgBounds[0], Pt2 = lineImgBounds[1];
-			line( cdst, Pt1, Pt2, Scalar(0,0,255), marking_width, LINE_AA);
+			cout << "cv::line # " << i << " : " << lines[i] << endl;
+			vector<cv::Point> lineImgBounds = returnHoughLineBound(img.size(), lines[i], marking_width);
+			cv::Point Pt1 = lineImgBounds[0], Pt2 = lineImgBounds[1];
+			cv::line( cdst, Pt1, Pt2, cv::Scalar(0,0,255), marking_width, cv::LINE_AA);
 		}
-		imwrite("Hough_transform_img_" + condition + ".jpg",cdst);
+		cv::imwrite("Hough_transform_img_" + condition + ".jpg",cdst);
 	}
 
-	Mat Imageprocess::generateHoughMask(const Mat &img, const vector<Vec2f> & lines, int marking_width){
+	cv::Mat Imageprocess::generateHoughMask(const cv::Mat &img, const vector<cv::Vec2f> & lines, int marking_width){
 		
-		Mat cdst = Mat::zeros(img.size(), CV_8UC1), seg_Mat;
+		cv::Mat cdst = cv::Mat::zeros(img.size(), CV_8UC1), seg_Mat;
 
 		// Get an extreme boundry of the image to guarantee that lines will cut the end
-		int max_dim = 2*max(img.rows,img.cols); 
 		for( size_t i = 0; i < lines.size(); i++)
 		{
-			cout << "Line # " << i << " : " << lines[i] << endl;
-			vector<Point> lineImgBounds = returnHoughLineBound(img.size(), lines[i], marking_width);
-			Point Pt1 = lineImgBounds[0], Pt2 = lineImgBounds[1];
-			line( cdst, Pt1, Pt2, Scalar(255), marking_width, LINE_AA);
+			cout << "cv::line # " << i << " : " << lines[i] << endl;
+			vector<cv::Point> lineImgBounds = returnHoughLineBound(img.size(), lines[i], marking_width);
+			cv::Point Pt1 = lineImgBounds[0], Pt2 = lineImgBounds[1];
+			cv::line( cdst, Pt1, Pt2, cv::Scalar(255), marking_width, cv::LINE_AA);
 		}
 
-		cv::bitwise_and(img, cdst, seg_Mat);
+		cv::imshow("Visualize Image with Hough Lines", cdst);
+		cv::waitKey();
 		return seg_Mat;
 	}
 
-	vector<Point> Imageprocess::calcLineToImgBounds(const Size& imgBounds, const Vec2f & line){
-		vector<Point> lineBound;
+	vector<cv::Point> Imageprocess::calcLineToImgBounds(const cv::Size& imgBounds, const cv::Vec2f & line){
+		vector<cv::Point> lineBound;
 		int WIDTH = imgBounds.width, HEIGHT = imgBounds.height;
 		cout << "WIDTH X HEIGHT : " << WIDTH << "  " << HEIGHT << endl;
 		float rho = line[0], theta = line[1];
 		cout << "RHO Value: " << rho << "   " << "THETA value: " << theta  << endl;
-		float x, y, a, b; // for testing boundry point
-		Point boundPoint;
+		float x, y, a, b; // for testing boundry cv::Point
+		cv::Point boundPoint;
 
 		// Check for y limits
 		y = 0;
@@ -1547,7 +1540,7 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[y=0] A found boundry point : " << boundPoint << endl;
+			cout << "[y=0] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		y = WIDTH;
@@ -1561,7 +1554,7 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[y = WIDTH] A found boundry point : " << boundPoint << endl;
+			cout << "[y = WIDTH] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		//Check for x limits
@@ -1576,7 +1569,7 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[x = 0;] A found boundry point : " << boundPoint << endl;
+			cout << "[x = 0;] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		x = HEIGHT;
@@ -1590,7 +1583,7 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[x = HEIGHT;] A found boundry point : " << boundPoint << endl;
+			cout << "[x = HEIGHT;] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		//TODO: Handle the case for the offset outside the image boundry
@@ -1599,8 +1592,8 @@ namespace roadmarking
 
 	//TODO: It fails when the lines are vertical
 	//TODO: Indices should be switched !!
-	vector<Point> Imageprocess::returnHoughLineBound(const Size& imgBounds, const Vec2f &line, int window_width){
-		vector<Point> lineBound;
+	vector<cv::Point> Imageprocess::returnHoughLineBound(const cv::Size& imgBounds, const cv::Vec2f &line, int window_width){
+		vector<cv::Point> lineBound;
 		int WIDTH = imgBounds.width, HEIGHT = imgBounds.height;
 		cout << "WIDTH X HEIGHT : " << WIDTH << "  " << HEIGHT << endl;
 		float rho = line[0], theta = line[1];
@@ -1608,8 +1601,8 @@ namespace roadmarking
 		if (theta == 0)
 			theta = 0.0001;
 		cout << "RHO Value: " << rho << "   " << "THETA value: " << theta  << endl;
-		float x, y, a, b; // for testing boundry point
-		Point boundPoint;
+		float x, y, a, b; // for testing boundry cv::Point
+		cv::Point boundPoint;
 
 		// Check for y limits
 		y = 0;
@@ -1619,7 +1612,7 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[y = 0] A found boundry point : " << boundPoint << endl;
+			cout << "[y = 0] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		y = WIDTH;
@@ -1629,7 +1622,7 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[y = WIDTH] A found boundry point : " << boundPoint << endl;
+			cout << "[y = WIDTH] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		//Check for x limits
@@ -1641,7 +1634,7 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[x = 0;] A found boundry point : " << boundPoint << endl;
+			cout << "[x = 0;] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		x = HEIGHT;
@@ -1652,11 +1645,11 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[x = HEIGHT;] A found boundry point : " << boundPoint << endl;
+			cout << "[x = HEIGHT;] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		cout << "=======================================" << endl;
-		cout << "Line bound Point # :"; 
+		cout << "cv::line bound cv::Point # :"; 
 		for(size_t i = 0; i < lineBound.size(); i++){
 			cout << " " << lineBound[i];
 		}
@@ -1667,34 +1660,64 @@ namespace roadmarking
 		return lineBound;
 	}
 
-	Mat Imageprocess::rotateFrame(Mat img, const Vec2f & trajectory_line, const size_t &num_line){
+	cv::Mat Imageprocess::rotateFrame(cv::Mat img, vector<cv::Vec2f> & houghLines){
 		// TODO: Should be a user defined input instead !!
-		double theta = trajectory_line[1];
+		cv::Mat disp_img = img.clone();
+		for(size_t line_i = 0; line_i < houghLines.size(); line_i++){
+			vector<cv::Point> lineImgBounds = returnHoughLineBound(disp_img.size(), houghLines[line_i], 5);
+			cv::Point line_start = lineImgBounds[0], line_end = lineImgBounds[1];
+			cv::line(disp_img, line_start, line_end, cv::Scalar(255), 2);
+		}
+		cv::imshow("Lines Before rotation", disp_img);
+
+		double theta = houghLines[0][1];
 		double rot_angle_in_degrees = (theta - CV_PI / 2.0)  * (180 / CV_PI);
 		cout << " Trajectory Angle: " << (theta *(180 / CV_PI)) << endl;
 		cout << " Rotation Angle : " << rot_angle_in_degrees << endl;
+		
 		// get rotation matrix for rotating the image around its center in pixel coordinates
 		cv::Point2f center((img.cols-1)/2.0, (img.rows-1)/2.0);
 		cv::Mat rot = cv::getRotationMatrix2D(center, rot_angle_in_degrees, 1.0);
 		// determine bounding rectangle, center not relevant
 		cv::Rect2f bbox = cv::RotatedRect(cv::Point2f(), img.size(), rot_angle_in_degrees).boundingRect2f();
+		
 		// adjust transformation matrix
 		rot.at<double>(0,2) += bbox.width/2.0 - img.cols/2.0;
 		rot.at<double>(1,2) += bbox.height/2.0 - img.rows/2.0;
 
-		Mat dst;
+		// Visualize lines before rotation and after
+		for(size_t i = 0; i < houghLines.size(); i++){
+			cout << "Before rotation cv::line coordinates: " << houghLines[i] << endl;
+		}
+		// Adjust the Hough Lines
+		double shifted_rho = sqrt(pow(rot.at<double>(0,2), 2) + pow(rot.at<double>(1,2), 2));
+		for(size_t i = 0; i < houghLines.size(); i++){
+			if( houghLines[i][0] < 0)
+				houghLines[i][0] += shifted_rho;
+			houghLines[i][1] =  CV_PI / 2.0;
+			cout << "After rotation cv::line coordinates: " << houghLines[i] << endl;
+		}
+
+		cv::Mat dst;
 		img.copyTo(dst);
 		cv::warpAffine(img, dst, rot, bbox.size());
-		imwrite("rotated_img_"+to_string(num_line)+".png", dst);
+		// for(size_t line_i = 0; line_i < houghLines.size(); line_i++){
+		// 	vector<cv::Point> lineImgBounds = returnHoughLineBound(dst.size(), houghLines[line_i], 5);
+		// 	cv::Point line_start = lineImgBounds[0], line_end = lineImgBounds[1];
+		// 	cv::line(dst, line_start, line_end, cv::Scalar(255), 2);
+		// }
+		// cv::imshow("Lines After rotation", dst);
+		// cv::waitKey();
+		// cv::imwrite("rotated_img.png", dst);
 		return dst;
 		//TODO: Revert it back to the original orientation
 	}
 
-	vector<vector<Point>> Imageprocess::getNonZeroIdx(vector<Vec2f> houghLines, Mat img_h, int off_y, int off_x){
+	vector<vector<cv::Point>> Imageprocess::getNonZeroIdx(vector<cv::Vec2f> houghLines, cv::Mat img_h, int off_y, int off_x){
 		
-		vector<vector<Point>> idxList; 
+		vector<vector<cv::Point>> idxList; 
 
-		// Initialize the vector of line indices
+		// Initialize the vector of cv::line indices
 		idxList.resize(houghLines.size());
 
 		// Parameters of your slideing window
@@ -1704,15 +1727,15 @@ namespace roadmarking
 		// Slidding step if the center of mass is the same
 		int StepSlide = off_y;
 
-		Mat src = img_h.clone();
-		Mat disp_src;
-		cvtColor(img_h, disp_src, COLOR_GRAY2BGR);
+		cv::Mat src = img_h.clone();
+		cv::Mat disp_src;
+		cv::cvtColor(img_h, disp_src, cv::COLOR_GRAY2BGR);
 
 		//TODO: Put limit of x moves
 		for(size_t line_i = 0; line_i < houghLines.size(); line_i++){
-			vector<Point> lineImgBounds = returnHoughLineBound(src.size(), houghLines[line_i], 5);
-			Point line_start = lineImgBounds[0], line_end = lineImgBounds[1];
-			line(disp_src, line_start, line_end, Scalar(0, 0, 255), 2);
+			vector<cv::Point> lineImgBounds = returnHoughLineBound(src.size(), houghLines[line_i], 5);
+			cv::Point line_start = lineImgBounds[0], line_end = lineImgBounds[1];
+			cv::line(disp_src, line_start, line_end, cv::Scalar(0, 0, 255), 2);
 			
 			int win_start_x, win_start_y;
 
@@ -1726,35 +1749,35 @@ namespace roadmarking
 
 			while (win_start_x < (src.rows - windows_n_rows) && win_start_y < (src.cols - windows_n_cols)){
 			
-				Point start_circle, end_circle, mass_center;
+				cv::Point start_circle, end_circle, mass_center;
 				start_circle.x = win_start_y;
 				start_circle.y = win_start_x;
 				end_circle = start_circle;
 				end_circle.x += windows_n_cols;
 				end_circle.y += windows_n_rows;
 
-				circle(disp_src, start_circle, 2, Scalar(255, 0, 0), 2);
-				circle(disp_src, end_circle, 2, Scalar(255, 0, 255), 2);
+				cv::circle(disp_src, start_circle, 2, cv::Scalar(255, 0, 0), 2);
+				cv::circle(disp_src, end_circle, 2, cv::Scalar(255, 0, 255), 2);
 
 				cout << "===============CURR WIN===============" << endl;
 				cout << "X, Y, WIDTH & HEIGHT: " << win_start_x << "," << win_start_y << "," << windows_n_cols << "," << windows_n_rows << endl;
 				cout << "============================================="<< endl;
-				Rect marking_win(win_start_y, win_start_x, windows_n_cols, windows_n_rows);
-				Mat roi = src(marking_win);
+				cv::Rect marking_win(win_start_y, win_start_x, windows_n_cols, windows_n_rows);
+				cv::Mat roi = src(marking_win);
 				// cout << "===============DISP CURR ROI===============" << endl;
 				// cout << "Window Info. : " << marking_win << endl;
 				// // Draw only rectangle
-				// rectangle(disp_src, marking_win, Scalar(0,255,0), 1);
-				// imshow("current roi", disp_src);
-				// waitKey();
+				// rectangle(disp_src, marking_win, cv::Scalar(0,255,0), 1);
+				// cv::imshow("current roi", disp_src);
+				// cv::waitKey();
 				// cout << "============================================="<< endl;
-				vector<Point> nonzero_region;
+				vector<cv::Point> nonzero_region;
 				findNonZero(roi, nonzero_region);
-				// cout << "===============BEFORE ACCUMM: NON ZERO POINT===============" << endl;
+				// cout << "===============BEFORE ACCUMM: NON ZERO cv::Point===============" << endl;
 				// for (size_t idx = 0; idx < nonzero_region.size(); idx++)
 				// 	cout << nonzero_region[idx] << endl;
 				// cout << "============================================="<< endl;
-				// cout << "===============AFTER ACCUMM: NON ZERO POINT===============" << endl;
+				// cout << "===============AFTER ACCUMM: NON ZERO cv::Point===============" << endl;
 				// for (size_t idx = 0; idx < nonzero_region.size(); idx++){
 				// 	nonzero_region[idx].x += win_start_y;
 				// 	nonzero_region[idx].y += win_start_x;
@@ -1763,9 +1786,9 @@ namespace roadmarking
 				// cout << "============================================="<< endl;
 				// idxList[line_i].insert(idxList[line_i].end(), nonzero_region.begin(), nonzero_region.end());
 				
-				// find moments of the image
-				Moments m = moments(roi,true);
-				Point p(m.m10/m.m00, m.m01/m.m00);
+				// find cv::Moments of the image
+				cv::Moments m = cv::moments(roi,true);
+				cv::Point p(m.m10/m.m00, m.m01/m.m00);
 
 				// coordinates of centroid
 				cout << "===============CURR CENTROID===============" << endl;
@@ -1781,57 +1804,61 @@ namespace roadmarking
 					win_start_x += off_shift;
 					mass_center.x = win_start_y - off_y;
 					mass_center.y = win_start_x + off_x;
-					circle(disp_src, mass_center, 2, Scalar(100, 255, 0), 2);
-					rectangle(disp_src, marking_win, Scalar(0,255,0), 1);
-					Mat disp_tmp;
-					// resize(disp_src, disp_tmp, Size(), 0.25, 0.25, INTER_LINEAR);
-					imshow("Center of Mass", disp_src);
-					waitKey();
+					cv::circle(disp_src, mass_center, 2, cv::Scalar(100, 255, 0), 2);
+					rectangle(disp_src, marking_win, cv::Scalar(0,255,0), 1);
+					// cv::Mat disp_tmp;
+					// resize(disp_src, disp_tmp, cv::Size(), 0.25, 0.25, cv::INTER_LINEAR);
+					// cv::imshow("Center of Mass", disp_src);
+					// cv::waitKey();
 					// Append only the center of mass
 					idxList[line_i].push_back(mass_center);
 				}
 				src(marking_win) = 0; disp_src(marking_win) = 0; // Set already processed region to zero so we won't accumlate them again.	
 			}
-			testPolyFit(img_h, idxList[line_i]);
-			polylines(disp_src, idxList[line_i], false, Scalar(0,255,0),2);
-			Mat disp_tmp;
-			// resize(disp_src, disp_tmp, Size(), 0.25, 0.25, INTER_LINEAR);
-			imshow("PolyLine result", disp_src);
-			waitKey();
+			// testPolyFit(img_h, idxList[line_i]);
+			vector<cv::Point> fitRes = robustFitting(idxList[line_i], src.size());
+			for(size_t i =0; i < fitRes.size(); i++){
+				cout << "Fit Point : " << fitRes[i] << endl;
+			}
+			cv::polylines(disp_src, fitRes, false, cv::Scalar(0,255,0),2);
+			cv::Mat disp_tmp;
+			// resize(disp_src, disp_tmp, cv::Size(), 0.25, 0.25, cv::INTER_LINEAR);
+			cv::imshow("PolyLine result", disp_src);
+			cv::waitKey();
 		}
 		return idxList;
 	}
 
 	// Is the error proportional to significance of the y or not ?
-	void Imageprocess::testPolyFit(const Mat & img, vector<Point> lane_idx){
+	void Imageprocess::testPolyFit(const cv::Mat & img, vector<cv::Point> lane_idx){
 
-		Mat cdst(Size(img.rows,img.cols), CV_8UC3, Scalar(0,0,0));
+		cv::Mat cdst(cv::Size(img.rows,img.cols), CV_8UC3, cv::Scalar(0,0,0));
 		cout << "The image boundries : " << img.rows << " , " << img.cols << endl;
 		size_t n = lane_idx.size();
 		double erry[n] = {0.0};
 		for(size_t i = 0; i < lane_idx.size(); i++)
 		{
-			cout << "Point : " << lane_idx[i] <<  " , " << erry[i] << endl;
-			circle(cdst, lane_idx[i], 10, Scalar(255,255,255), 8,0);
+			cout << "cv::Point : " << lane_idx[i] <<  " , " << erry[i] << endl;
+			cv::circle(cdst, lane_idx[i], 10, cv::Scalar(255,255,255), 8,0);
 		}
-		cout << "The size of the samples: " << lane_idx.size() << endl;
-		// resize(cdst, cdst, Size(), 0.5, 0.5, INTER_LINEAR);
-		// imwrite("poly_line_img.jpg",cdst);
+		cout << "The cv::Size of the samples: " << lane_idx.size() << endl;
+		// resize(cdst, cdst, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
+		// cv::imwrite("poly_line_img.jpg",cdst);
 		
 		// for(size_t i=0; i < lane_idx.size(); i++){
-		// 	cout << "Display point: " << lane_idx[i] << endl;
+		// 	cout << "Display cv::Point: " << lane_idx[i] << endl;
 		// }
 
-		// vector<Point> out = polyfit::PolyFitCV(lane_idx, erry, 2, std::pair<size_t,size_t>(img.rows, img.cols));
-		// polylines(cdst, out, false, Scalar(0,255,0), 3);
-		// // resize(cdst, cdst, Size(), 0.5, 0.5, INTER_LINEAR);
-		imwrite("poly_line_img.jpg",cdst);
+		// vector<cv::Point> out = polyfit::PolyFitCV(lane_idx, erry, 2, std::pair<size_t,size_t>(img.rows, img.cols));
+		// cv::polylines(cdst, out, false, cv::Scalar(0,255,0), 3);
+		// // resize(cdst, cdst, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
+		cv::imwrite("poly_line_img.jpg",cdst);
 	}
 
-	void Imageprocess::applyPrespectiveTransform(const Mat &img, Bounds& bounds){
-		Mat img_tmp(img.size(), CV_8UC1), tansform_mat;
-		vector<Vec2f> src, dst;
-		Vec2f vertex_src, vertex_dst;
+	void Imageprocess::applyPrespectiveTransform(const cv::Mat &img, Bounds& bounds){
+		cv::Mat img_tmp(img.size(), CV_8UC1), tansform_mat;
+		vector<cv::Vec2f> src, dst;
+		cv::Vec2f vertex_src, vertex_dst;
 
 		// Get the source boundry points
 		
@@ -1882,26 +1909,26 @@ namespace roadmarking
 		warpPerspective(img, img_tmp, tansform_mat, img.size());
 
 		// Display the result
-		imshow("After Prespective Transformation", img_tmp);
+		cv::imshow("After Prespective Transformation", img_tmp);
 		// Display the result
-		imshow("Before Prespective Image", img);
-		waitKey(0);
+		cv::imshow("Before Prespective Image", img);
+		cv::waitKey(0);
 	}
 
-	vector<Point> Imageprocess::returnHoughWindowContour(const Size& imgBounds, const Vec2f & line, const size_t & houghWinOffset){
+	vector<cv::Point> Imageprocess::returnHoughWindowContour(const cv::Size& imgBounds, const cv::Vec2f & line, const size_t & houghWinOffset){
 
-		vector<Point> lineBounds;
-		Vec2f boundingLine;
+		vector<cv::Point> lineBounds;
+		cv::Vec2f boundingLine;
 
 		int WIDTH = imgBounds.width, HEIGHT = imgBounds.height;
-		//Get lower bounding line end points
+		//Get lower bounding cv::line end points
 		boundingLine = {line[0] - houghWinOffset, line[1]};
-		vector<Point> lowerBounds = calcLineToImgBounds(imgBounds, boundingLine);
+		vector<cv::Point> lowerBounds = calcLineToImgBounds(imgBounds, boundingLine);
 		lineBounds.insert(lineBounds.end(), lowerBounds.begin(), lowerBounds.end());
 
-		//Get upper bounding line end points
+		//Get upper bounding cv::line end points
 		boundingLine = {line[0] + houghWinOffset, line[1]};
-		vector<Point> upperBounds = calcLineToImgBounds(imgBounds, boundingLine);
+		vector<cv::Point> upperBounds = calcLineToImgBounds(imgBounds, boundingLine);
 		lineBounds.insert(lineBounds.end(), upperBounds.begin(), upperBounds.end());
 
 		cout << "AFTER: =======================================" << endl;
@@ -1913,5 +1940,135 @@ namespace roadmarking
 
 		return lineBounds;
 		
+	}
+
+	vector<cv::Point> Imageprocess::robustFitting(vector<cv::Point> data_points, cv::Size img_bounds){
+		double *x;
+		double *y;
+		TVectorD vpar;
+		const size_t n = data_points.size();
+		vector<cv::Point> robust_poly;
+
+		//Data points to fit
+		x = new double[n];
+		y = new double[n];
+
+		cout << "====== Points before fitting ======" << endl;
+		for (size_t i =0; i < data_points.size(); i++){
+			x[i] = data_points[i].x;
+			y[i] = data_points[i].y;
+			cout << "X,Y " << x[i] << " " << y[i] << endl;
+		}
+		TLinearFitter *lf=new TLinearFitter(1, "pol2");
+		// In order not to save the fitting data
+		lf->StoreData(false); 
+		//TODO: run StoreData(kFALSE) to avoid storing data after fitting
+		lf->AssignData(n, 1, x, y);
+		// 0.7 Fraction for how good is the data used for fitting.
+		lf->EvalRobust(0.7); 
+		lf->PrintResults(3);
+		lf->GetParameters(vpar);
+
+		// Extract coefficient of the fit
+		double a = vpar[2], b = vpar[1], c = vpar[0];
+
+		// Adjust the par[0] to be bounded by the Y val
+		double x_bound = img_bounds.width, y_bound = img_bounds.height;
+		
+		// define the x limit for the polynomial
+		double x_start = 0, x_end = x_bound;
+		cout << "The Bound of the X is " << x_bound << endl;
+		for (size_t i = 0; i < vpar.GetNoElements(); i++){
+			cout << "The coofficient values are : " << vpar[i] << endl;
+		}
+		// Solve for the roots of the polynomial so we can bound our solution
+		// When y = y_bound
+		double c1 = c - y_bound;
+		ROOT::Math::Polynomial poly(a, b, c1);
+		std::vector<double> sol_real = poly.FindRealRoots();
+		//TODO:: Order the results and take the one in the 
+		for(size_t i=0; i < sol_real.size(); i++)
+			if (sol_real[i] > 0)
+			{
+				if(sol_real[i] < x_start)
+				{	
+					x_start = sol_real[i];
+				}
+				else
+				{
+					if(sol_real[i] < x_bound)
+					{
+						if (sol_real[i] > x_end)
+						{
+							x_end = sol_real[i];
+						}
+					}
+				}
+			}
+
+		//Second Bound: When y = 0
+		poly = ROOT::Math::Polynomial(a , b, c);
+		sol_real = poly.FindRealRoots();
+		for(size_t i=0; i < sol_real.size(); i++)
+			if (sol_real[i] > 0)
+			{
+				if(sol_real[i] < x_start)
+				{	
+					x_start = sol_real[i];
+				}
+				else
+				{
+					if(sol_real[i] < x_bound)
+					{
+						if (sol_real[i] > x_end)
+						{
+							x_end = sol_real[i];
+						}
+					}
+				}
+			}
+
+		// Estimate test point for X: X_START:20:X_END
+		vector<double> x_test = linspace(x_start, x_end, 20);
+		poly = ROOT::Math::Polynomial(a, b, c);
+		for (size_t i =0; i < x_test.size(); i++){
+			double y, dy;
+			cv::Point data_point;
+			poly.FdF(x_test[i], y, dy);
+			data_point.x = cvRound(x_test[i]);
+			data_point.y = cvRound(y);
+			robust_poly.push_back(data_point);
+		}
+		return robust_poly;
+	}
+	void Imageprocess::EvaluateLaneMarkings(const cv::Mat & imgFilled){
+		CMatrixIndiceWithPred.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
+		size_t TP = 0, TN = 0, FP = 0, FN = 0;
+		size_t tot_marks = 0;
+		for (size_t i = timin; i < timin + imgFilled.rows; i++)
+		{
+			for (size_t j = tjmin; j < tjmin + imgFilled.cols; j++)
+			{
+				if (imgFilled.at<uchar>(i - timin, j - tjmin) == 1)
+				{
+					for (int k = 0; k < CMatrixIndiceWithGT[i][j].size(); k++)
+						if (CMatrixIndiceWithGT[i][j][k] == 1)
+							++TP;
+						else
+							++FP;
+				}
+				else{
+						for (int k = 0; k < CMatrixIndiceWithGT[i][j].size(); k++)
+							if (CMatrixIndiceWithGT[i][j][k] == 1)
+								++FN;
+							else
+								++TN;
+				}
+			}
+		}
+		cout << "TP, TN, FP, FN : " << to_string(TP) << " , " << to_string(TN) << " , " << to_string(FP) << " , " << to_string(FN) << " , " << endl;
+		double IoU = TP / double(TP + FP + FN);
+		cout << "IoU : " << IoU << endl;
+		cout << "Total number of marking points: " << tot_marks << endl;
 	}
 }

@@ -36,23 +36,29 @@ using namespace boost::filesystem;
 
 namespace roadmarking
 {
+	//TODO:: For some reason it reads one value more than the expected
 	void DataIo::readGroundTruth(string groundTruthfile){
 		std::ifstream infile;
+		int count_markings = 0;
 		infile.open(groundTruthfile, ios::in);
 		if(!infile.is_open())
 			cout << "Failed to open the parameter file, use default parameters." << endl;
 		while (!infile.eof())
 		{
-			char val;
+			size_t val;
 			infile >> val;
-			groundTruth.groundTruthVals.push_back(val);
+			//Only load classes for markings and set the rest to be 0
+			if (val != 2)
+				groundTruth.groundTruthVals.push_back(0);
+			else
+				{
+					groundTruth.groundTruthVals.push_back(1);
+					count_markings++;
+				}
 		}
+		cout << "Total number of marking points : " << count_markings << endl;
 		size_t gt_size = groundTruth.groundTruthVals.size();
-		cout << "Total number of labels loaded are : " << groundTruth.groundTruthVals.size() << endl;
-		cout << "The last outputed label : " << groundTruth.groundTruthVals[gt_size-1] << endl;
-		cout << "The one before the last outputed label : " << groundTruth.groundTruthVals[gt_size-3] << endl;
-		cout << "The first outputed label : " << groundTruth.groundTruthVals[0] << endl;
-		cout << "The second outputed label : " << groundTruth.groundTruthVals[1] << endl;
+		groundTruth.groundTruthVals.pop_back();
 	}
 
 	void DataIo::readParalist(string paralistfile)
@@ -396,6 +402,7 @@ namespace roadmarking
 	{
 		pcl::console::setVerbosityLevel(pcl::console::L_ALWAYS); //Ban pcl warnings
 		// To extract the inliers === Having intensity value above 0.3 value
+		// TODO: Integrate it for KITTI solution
 		pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
 		pcl::ExtractIndices<pcl::PointXYZI> extract;
 		//intensity should be stored as 'intensity' (lower case i) field instead of 'Intensity' in the pcd file
@@ -431,7 +438,7 @@ namespace roadmarking
 		std::cout << "Loaded Points After filtering: "
                 << pointCloud->points.size()
                 << std::endl;
-		if (pointCloud->points[0].intensity==0) //check if the intensity exsit
+		if (pointCloud->points[0].intensity==0) //check if the intensity exist
 			printf("Warning! Point cloud intensity may not be imported properly, check the scalar field's name.\n");
 		getCloudBound(pointCloud, bound_3d);
 		

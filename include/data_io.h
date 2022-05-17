@@ -73,7 +73,7 @@ namespace roadmarking
 		};
 
 		struct GroundTruth{
-			vector<char> groundTruthVals;
+			vector<int> groundTruthVals;
 		};
 		/*
 		Parameters Notification
