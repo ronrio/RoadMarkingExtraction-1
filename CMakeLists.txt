@@ -11,6 +11,7 @@ IF(APPLE)
     set(THREADS_PREFER_PTHREAD_FLAG ON)
 ENDIF()
 
+
 SET(CMAKE_CXX_FLAGS "-O3 -std=c++11 -w -fopenmp -pthread ")
 SET(CMAKE_C_FLAGS "-O3 -std=c++11 -fopenmp -pthread ")
 
@@ -24,7 +25,13 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 ####### Required libs #######
-#eigen3, liblas, OpenCV (>=2.4), pcl (>=1.7)
+#ROOT, eigen3, liblas, OpenCV (>=2.4), pcl (>=1.7)
+
+#ROOT
+find_package(ROOT REQUIRED)
+include_directories(${ROOT_INCLUDE_DIRS})
+message("DEP: ROOT [OK] ")
+
 
 #eigen
 find_package(Eigen3 REQUIRED)
@@ -32,6 +39,9 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 message("DEP: EIGEN [OK] ")
 
 #PCL1.8 {1.7}
+if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
+     set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
+endif()
 FIND_PACKAGE(PCL REQUIRED)
 INCLUDE_DIRECTORIES(${PCL_INCLUDE_DIRS})
 LIST(REMOVE_ITEM PCL_LIBRARIES "vtkproj4")
@@ -60,9 +70,12 @@ include_directories(${PROJECT_SOURCE_DIR}/include/dxflib)
 AUX_SOURCE_DIRECTORY(${PROJECT_SOURCE_DIR}/src SRC_LIST)
 message("SRC_LIST is " ${SRC_LIST})
 
-SET(DEP_LIBS ${DEP_LIBS} ${OpenCV_LIBS} ${PCL_LIBRARIES} ${libLAS_LIBRARIES})
+SET(DEP_LIBS ${DEP_LIBS} ${OpenCV_LIBS} ${PCL_LIBRARIES} ${libLAS_LIBRARIES} ${ROOT_LIBRARIES})
+
+message("ROOT Libraries are : " ${ROOT_LIBRARIES})
+
 
 add_executable(roadmarking ${PROJECT_SOURCE_DIR}/test/roadmarking_main.cpp ${SRC_LIST})
-target_link_libraries(roadmarking ${DEP_LIBS})
+target_link_libraries(roadmarking PUBLIC ${DEP_LIBS})
 
 
