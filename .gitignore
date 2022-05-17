@@ -45,3 +45,6 @@
 *.jpg
 
 *.cpp.o
+
+# cmake file
+*.cmake
