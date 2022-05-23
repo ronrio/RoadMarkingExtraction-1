@@ -1,10 +1,9 @@
 #Data Folder
-./hope.pcd_out
-./pcds_out
-./sample_data
-./0015_sync_pcd/*
-./build
-./sample_data/*
+hope.pcd_out
+pcds_out
+sample_data
+0015_sync_pcd/*
+build
 
 # Prerequisites
 *.d
@@ -49,3 +48,6 @@
 
 # cmake file
 *.cmake
+
+#.PCD
+*.pcd

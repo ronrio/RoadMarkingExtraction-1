@@ -82,6 +82,43 @@ namespace roadmarking
 		//std::cerr << *ngcloud << std::endl;
 	}
 
+	//TODO:: the dumpest idea of applying the classification over a ground truth
+	void Csegmentation::getClassificationResult(pcXYZRGBPtr pcGT, const vector<pcXYZI> &inclouds){
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("GT Cloud"));
+		viewer->setBackgroundColor(255, 255, 255);
+		cout << "The size of the original ground truth point cloud is : " << pcGT->points.size() << endl;
+		for(int i=0; i< inclouds.size(); i++){
+			pcXYZRGBPtr pcTmp(new pcXYZRGB());
+			//pcl::copyPointCloud(inclouds[i].points, *pcTmp);
+			for(int j = 0; j < inclouds[i].size(); j++){
+				pcl::PointXYZRGB mark_p;
+				pcl::copyPoint(inclouds[i].points[j], mark_p);
+				mark_p.r = 255.0;
+				mark_p.g = 0.0;
+				mark_p.b = 0.0;
+				pcTmp->points.push_back(mark_p);
+				//viewer->addSphere(mark_p, 0.1, 0.0, 0.0, 1.0, "Point"+to_string(i)+to_string(j));
+			}
+			// concatentate PC
+			pcGT->points.insert(pcGT->points.end(), pcTmp->points.begin(), pcTmp->points.end());
+			/*for(int j=0; j < inclouds[i].size(); j++){
+				pcl::PointXYZI inlier_Point = inclouds[i].points[j];
+				if (inlier_Point.x == )
+			}*/
+		}
+		std::sort(pcGT->points.begin(), pcGT->points.end(), comparePoint);
+		auto unique_end = std::unique(pcGT->points.begin(), pcGT->points.end(), equalPoint);
+		pcGT->points.erase(unique_end, pcGT->points.end());
+		cout << "After adding marking clouds, the size of the original ground truth point cloud is : " << pcGT->points.size() << endl;
+		viewer->addPointCloud(pcGT, "GT Cloud");
+		cout << "Click X(close) to continue..." << endl;
+		while (!viewer->wasStopped())
+		{
+			viewer->spinOnce(100);
+			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+		}
+	}
+
 	void Csegmentation::NFilter(const vector<pcXYZI> &inclouds, vector<pcXYZI> &outclouds, int K)
 	{
 		for (int i = 0; i < inclouds.size(); i++)
@@ -187,7 +224,7 @@ namespace roadmarking
 				}
 			}
 
-			//cout << "Threshold : "<<threshold<< endl;
+			// cout << "Threshold : "<<threshold<< endl;
 			for (int j = 0; j < pointnumber; j++)
 			{
 				int bin = (N - 1) * intensitylist[j] / intensitymax;
@@ -196,12 +233,12 @@ namespace roadmarking
 					outclouds[i].push_back(inclouds[i].points[j]);
 				}
 			}
-			//cout << "Cloud " << i << " 's number after Otsu Thresholding is: " <<outclouds[i].size()<< endl;
+			//cout << "Cloud " << i << " 's number after Otsu Thresholding is: " << outclouds[i].size()<< endl;
 
 			//SOR: Statistics Outlier Remover
 			SORFilter(outclouds[i], outSORclouds[i], MeanK, std);
 
-			//cout << "Cloud " << i << " 's number after SOR is: " <<outclouds[i].size()<< endl;
+			//cout << "Cloud " << i << " 's number after SOR is: " << outclouds[i].size()<< endl;
 
 		}
 
@@ -253,6 +290,75 @@ namespace roadmarking
 		}
 
 	}
+
+	void Csegmentation::VisualizeStart_EndBB(vector<vector<pcl::PointXYZI>> & boundingdatas, const std::vector<int> &dash_idx, pcXYZRGBPtr pcGT){
+
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("End points Cloud"));
+		viewer->setBackgroundColor(255, 255, 255);
+
+		for (auto i = dash_idx.begin(); i != dash_idx.end(); i++){
+
+			double X_min = boundingdatas[*i][0].x;
+			double Y_min = boundingdatas[*i][1].y;
+			double X_max = boundingdatas[*i][2].x;
+			double Y_max = boundingdatas[*i][3].y;
+
+			pcl::PointXYZRGB XminP, XmaxP, YminP, YmaxP;
+
+			pcl::copyPoint(boundingdatas[*i][0], XminP);
+			pcl::copyPoint(boundingdatas[*i][1], YminP);
+			pcl::copyPoint(boundingdatas[*i][2], XmaxP);
+			pcl::copyPoint(boundingdatas[*i][3], YmaxP);
+
+
+			viewer->addSphere(XminP, 0.2, 1.0, 0.0, 0.0, "sphere X_min" + to_string(*i));
+			viewer->addSphere(YminP, 0.2, 0.0, 1.0, 0.0, "sphere Y_min" + to_string(*i));
+			viewer->addSphere(XmaxP, 0.2, 0.0, 0.0, 1.0, "sphere X_max" + to_string(*i));
+			viewer->addSphere(YmaxP, 0.2, 1.0, 1.0, 1.0, "sphere Y_max" + to_string(*i));
+
+			// cout << "X, Y (Min&Max) " << X_min << " " << Y_min << " " << X_max << " " << Y_max << endl;
+
+			double dX = X_max - X_min;
+			double dY = Y_max - Y_min;
+
+			// Start & End points coordinates
+			double X1 = X_min;
+			double X2 = X_max;
+
+			double Y1 = Y_min + dY / 2.0;
+			double Y2 = Y1 ; // The middle points of the marking
+			double Z = boundingdatas[*i][0].z; // The Z value is indifferent since marking should be flat on the road
+
+			pcl::PointXYZRGB StartPoint, EndPoint;
+
+			StartPoint.x = X1;
+			StartPoint.y = Y1;
+			StartPoint.z = Z;
+
+			EndPoint.x = X2;
+			EndPoint.y = Y2;
+			EndPoint.z = Z;
+
+			// pcGT.push_back(StartPoint);
+			// pcGT.push_back(EndPoint);
+
+			//viewer->addSphere(StartPoint, 0.2, 1.0, 0.0, 0.0, "sphere 1:" + to_string(i));
+			//viewer->addSphere(EndPoint, 0.2, 0.0, 0.0, 1.0, "sphere 2:" + to_string(i) );
+
+			// cout << "The starting point of a marking :" << StartPoint << endl;
+			// cout << "The ending point of a marking :" << EndPoint << endl;
+
+		}
+		viewer->addCoordinateSystem(3.0, 0, 0, 130);
+		viewer->addPointCloud(pcGT, "Boundry Cloud");
+		//viewer->addPointCloud(pred_pc, "Prediction Cloud");
+		cout << "Click X(close) to continue..." << endl;
+		while (!viewer->wasStopped())
+		{
+			viewer->spinOnce(100);
+			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+		}
+	}
 	void Csegmentation::BoundingFeatureCalculation(const vector<vector<pcl::PointXYZI>> & boundingdatas, vector<BoundingFeature> & boundingfeatures)
 	{
 		boundingfeatures.resize(boundingdatas.size());
@@ -269,10 +375,13 @@ namespace roadmarking
 
 			Ax = boundingdatas[i][0].x;
 			Bx = boundingdatas[i][1].x;
+
 			Cx = boundingdatas[i][2].x;
 			Dx = boundingdatas[i][3].x;
+
 			Ay = boundingdatas[i][0].y;
 			By = boundingdatas[i][1].y;
+
 			Cy = boundingdatas[i][2].y;
 			Dy = boundingdatas[i][3].y;
 
@@ -294,6 +403,10 @@ namespace roadmarking
 			boundingfeatures[i].sortingEdges.push_back(DA);
 
 			sort(boundingfeatures[i].sortingEdges.begin(), boundingfeatures[i].sortingEdges.end()); 
+			/*cout << "Corner of the bounding box :" << boundingfeatures[i].corner << endl;
+			for(int k = 0; k <boundingfeatures[i].sortingEdges.size(); k++){
+				cout << "Corner of the bounding box :" << boundingfeatures[i].sortingEdges[k] << endl;
+			}*/
 		}
 
 	}
@@ -386,10 +499,10 @@ namespace roadmarking
 			}
 
 			if (boundingfeatures[i].corner > angt1 && boundingfeatures[i].corner < angt2
-				&& boundingfeatures[i].sortingEdges[3]<lt4 && boundingfeatures[i].sortingEdges[3]>lt3
-				&& boundingfeatures[i].sortingEdges[2]<lt4 && boundingfeatures[i].sortingEdges[2]>lt3
-				&& boundingfeatures[i].sortingEdges[1]<lt2 && boundingfeatures[i].sortingEdges[1]>lt1
-				&& boundingfeatures[i].sortingEdges[0]<lt2 && boundingfeatures[i].sortingEdges[0]>lt1
+				&& boundingfeatures[i].sortingEdges[3] < lt4 && boundingfeatures[i].sortingEdges[3] > lt3
+				&& boundingfeatures[i].sortingEdges[2] < lt4 && boundingfeatures[i].sortingEdges[2] > lt3
+				&& boundingfeatures[i].sortingEdges[1] < lt2 && boundingfeatures[i].sortingEdges[1] > lt1
+				&& boundingfeatures[i].sortingEdges[0] < lt2 && boundingfeatures[i].sortingEdges[0] > lt1
 				&& boundingfeatures[i].sortingEdges[3] / boundingfeatures[i].sortingEdges[2] < ratio1
 				&& boundingfeatures[i].sortingEdges[1] / boundingfeatures[i].sortingEdges[0] < ratio1)
 			{
@@ -397,7 +510,7 @@ namespace roadmarking
 				rough_classified = true;
 			}
 
-			if (boundingfeatures[i].corner > angt3 && boundingfeatures[i].corner < angt4
+			/*if (boundingfeatures[i].corner > angt3 && boundingfeatures[i].corner < angt4
 				&& boundingfeatures[i].sortingEdges[3]>lt8 && boundingfeatures[i].sortingEdges[3] < lt7
 				&& boundingfeatures[i].sortingEdges[2]>lt8 && boundingfeatures[i].sortingEdges[2] < lt7
 				&& boundingfeatures[i].sortingEdges[1]>lt8 && boundingfeatures[i].sortingEdges[1] < lt7
@@ -405,7 +518,7 @@ namespace roadmarking
 			{
 				roadmarkings[i].category = 8;  
 				rough_classified = true;
-			}
+			}*/
 			if (rough_classified)
 				cout << "Object [" << i << "] ---> Category [" << roadmarkings[i].category << "]" << endl;
 		}
@@ -1094,9 +1207,42 @@ namespace roadmarking
 		cout << "Pedestrian Warning Markings Number: " << categorynumber[8] << endl;
 		*/
 	}
+	// https://stackoverflow.com/questions/59395218/pcl-scale-two-point-clouds-to-the-same-size
+	void Csegmentation::EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds){
+	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("End points Cloud"));
+	viewer->setBackgroundColor(255, 255, 255);
+    pcl::PCA<pcl::PointXYZI> pca;
+    
+	pcl::PointXYZI MeanPoint, StartPoint, EndPoint;
+	pcl::PointXYZI goldenMin, goldenMax;
+	pcXYZI projected;
+
+    for(int i = 0; i < boundaryclouds.size(); i++){
+		if(boundaryclouds[i].size() > 3){ //This is important for SVD to work, limiting on more points should be applicable as well.
+        
+		pca.setInputCloud(boundaryclouds[i].makeShared());
+		pca.project(boundaryclouds[i], projected);
+
+    	pcl::getMinMax3D(projected, goldenMin, goldenMax);
+		pca.reconstruct(goldenMin, StartPoint);
+		pca.reconstruct(goldenMax, EndPoint);
+
+		viewer->addSphere(StartPoint, 0.2, 1.0, 0.0, 0.0, "Start Point:" + to_string(i));
+    	viewer->addSphere(EndPoint, 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
+		}
+    }
+	viewer->addPointCloud(pcGT, "PointCloud Reference");
+    cout << "Click X(close) to continue..." << endl;
+		while (!viewer->wasStopped())
+		{
+			viewer->spinOnce(100);
+			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+		}
+		
+	}
 
 
-	void Csegmentation::BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, int down_rate, float alpha_value_scale)
+	void Csegmentation::BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, pcXYZRGBPtr pcGT , int down_rate, float alpha_value_scale)
 	{
 		boundaryclouds.resize(clouds.size());
 		int i;
@@ -1106,6 +1252,7 @@ namespace roadmarking
 		{
 			boundaryclouds[i] = alphashape(clouds[i], resolution*alpha_value_scale); //this is the parameter for alpha-shape, very important
 
+			//Downsampling
 			pcXYZIPtr tempcloud(new pcXYZI);
 			for (int j = 0; j < boundaryclouds[i].points.size(); j++)
 			{
@@ -1114,7 +1261,30 @@ namespace roadmarking
 			}
 			tempcloud->points.swap(boundaryclouds[i].points);
 		}
+		// pcXYZRGBPtr boundC(new pcXYZRGB);
+		// visualizeConcaveHullBoundries(pcGT, boundaryclouds);
 		//cout << "Boundary Extraction Done" << endl;
+	}
+
+	void Csegmentation::visualizeConcaveHullBoundries(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds){
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Boundry points Cloud"));
+		viewer->setBackgroundColor(255, 255, 255);
+		for(int i = 0; i < boundaryclouds.size(); i++){
+			for(int j = 0; j < boundaryclouds[i].size(); j++){
+				pcl::PointXYZRGB boundrypoint;
+				boundrypoint.x = boundaryclouds[i].points[j].x;
+				boundrypoint.y = boundaryclouds[i].points[j].y;
+				boundrypoint.z = boundaryclouds[i].points[j].z;
+				viewer->addSphere(boundrypoint, 0.1, "Boundry Point " + to_string(j) + "  " + to_string(i));
+			}
+		}
+		cout << "Click X(close) to continue..." << endl;
+		while (!viewer->wasStopped())
+		{
+			viewer->spinOnce(100);
+			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+		}
+
 	}
 
 
@@ -1126,7 +1296,10 @@ namespace roadmarking
 		chull.setAlpha(alpha_value);              
 		chull.reconstruct(cloud_hull);
 
-		//std::cout<< "Concave hull has: " << cloud_hull->points.size() << " data points." << endl;
+		/*std::cout<< "Concave hull has: " << cloud_hull.points.size() << " data points." << endl;
+		for (size_t i = 0; i < cloud_hull.size(); i++){
+			cout << "Cloud Hull point : " << cloud_hull[i] << endl;
+		}*/
 		return cloud_hull;
 	}
 

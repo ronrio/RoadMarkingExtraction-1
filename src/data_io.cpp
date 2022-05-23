@@ -42,7 +42,7 @@ namespace roadmarking
 		int count_markings = 0;
 		infile.open(groundTruthfile, ios::in);
 		if(!infile.is_open())
-			cout << "Failed to open the parameter file, use default parameters." << endl;
+			cout << "Failed to open the Ground truth file !!" << endl;
 		while (!infile.eof())
 		{
 			size_t val;
@@ -59,6 +59,7 @@ namespace roadmarking
 		cout << "Total number of marking points : " << count_markings << endl;
 		size_t gt_size = groundTruth.groundTruthVals.size();
 		groundTruth.groundTruthVals.pop_back();
+		cout << "Total number of loaded labels : " << groundTruth.groundTruthVals.size() << endl;
 	}
 
 	void DataIo::readParalist(string paralistfile)
@@ -808,9 +809,7 @@ namespace roadmarking
 			pt.b = 255 * (gcloud->points[i].intensity - mini) / (maxi - mini);
 			GC->points.push_back(pt);
 		}
-
 		viewer->addPointCloud(GC, "Ground");
-
 		cout << "Click X(close) to continue..." << endl;
 		while (!viewer->wasStopped())
 		{

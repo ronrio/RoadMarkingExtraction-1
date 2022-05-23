@@ -4,10 +4,33 @@
 #include "utility.h"
 #include <cfloat>
 
+#include <pcl/visualization/common/common.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/common/io.h>
+#include <pcl/common/pca.h>
+
 using namespace std;
 
 namespace roadmarking
 {
+	struct {
+        bool operator()(pcl::PointXYZRGB p1, pcl::PointXYZRGB p2) const {
+			if (p1.x != p2.x)
+				return p1.x > p2.x;
+			else if (p1.y != p2.y)
+				return  p1.y > p2.y;
+			else
+				return p1.z > p2.z;
+		}
+    } comparePoint;
+
+	struct {
+        bool operator()(pcl::PointXYZRGB p1, pcl::PointXYZRGB p2) const {
+   		 if (p1.x == p2.x && p1.y == p2.y && p1.z == p2.z)
+        	return true;
+    	return false;
+		}
+    } equalPoint;
 
 	class Csegmentation
 	{
@@ -26,7 +49,7 @@ namespace roadmarking
 
 		void BoundingInformation(const vector<pcXYZI> &clouds, vector<vector<pcl::PointXYZI>> & boundingdatas); //bounding 4 points 
 		void BoundingFeatureCalculation(const vector<vector<pcl::PointXYZI>> & boundingdatas, vector<BoundingFeature> & boundingfeatures); //bounding 4 points
-		void BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, int down_rate=1, float alpha_value_scale = 0.8);                 
+		void BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, pcXYZRGBPtr pcGT, int down_rate=1, float alpha_value_scale = 0.8);                 
 		void CornerExtraction(const vector<pcXYZI> &boundaryclouds, vector<pcXYZI> &cornerclouds, bool UseRadius, int K, float radius, float dis_threshold, float maxcos);     
 		
 		void CategoryJudgementBox_highway(const vector<BoundingFeature> & boundingfeatures, RoadMarkings & roadmarkings);
@@ -43,15 +66,24 @@ namespace roadmarking
 		pcXYZI alphashape(const pcXYZI &cloud, float alpha_value);   //Concave Hull Generation
 		
 		pcXYZI CornerpointKNN(const pcXYZI &boundarycloud, int K, float disthreshold, float maxcos);                   //KNN corner point extraction 
-		pcXYZI CornerpointRadius(const pcXYZI &boundarycloud, float radius, float disthreshold, float maxcos);         //Radius corner point extraction 
+		pcXYZI CornerpointRadius(const pcXYZI &boundarycloud, float radius, float disthreshold, float maxcos);         //Radius corner point extraction
+
+		void visualizeConcaveHullBoundries(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds);  // Show the extracted boundry of the point cloud
+		void VisualizeStart_EndBB(vector<vector<pcl::PointXYZI>> & boundingdatas,const std::vector<int> &dash_idx, pcXYZRGBPtr pcGT);
 
 		//pcXYZI CornerClusteringKMeans(const pcXYZI &cornercloud, int K);
+		// https://stackoverflow.com/questions/34481190/removing-duplicates-of-3d-points-in-a-vector-in-c
+
+		void getClassificationResult(pcXYZRGBPtr pcGT, const vector<pcXYZI> &outclouds);
+		void EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds);
 
 		
 	protected:
 	
+	
 	private:
 		float resolution;
+		
 		
 	};
 }

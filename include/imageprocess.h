@@ -10,15 +10,17 @@
 #include <pcl/point_cloud.h>  
 #include <pcl/point_types.h>  
 #include <pcl/io/pcd_io.h> 
+#include <pcl/visualization/common/common.h>
+#include <pcl/visualization/pcl_visualizer.h>
 
 //boost
 #include <boost/filesystem.hpp>
 
 //ROOT
-#include <TLinearFitter.h>
+/*#include <TLinearFitter.h>
 #include <TMatrixT.h>
 #include <Math/RootFinder.h>
-#include <Math/Polynomial.h>
+#include <Math/Polynomial.h>*/
 // #include <SpecFuncCephes.h>
 
 //opencv
@@ -99,10 +101,11 @@ namespace roadmarking
 		  vector<vector<vector<int>>> GCMatrixIndice;   //ground cloud
 		  vector<vector<vector<int>>> NGCMatrixIndice;  //non-ground cloud
 		  vector<vector<vector<int>>> CMatrixIndiceWithGT; //ground truth labels for the point cloud
-		  vector<vector<vector<int>>> CMatrixIndiceWithPred; //ground truth labels for the point cloud
 		  int totallabel; 
 		  vector<vector <int>>  labelx;  
-		  vector<vector <int>>  labely;  
+		  vector<vector <int>>  labely;
+
+		  pcXYZRGBPtr pcGT;
 
 		protected:
 	
@@ -135,8 +138,9 @@ namespace roadmarking
 					*x = val;
 				return xs;
 			}
-			vector<cv::Point> robustFitting(vector<cv::Point>, cv::Size img_bounds);
+			// vector<cv::Point> robustFitting(vector<cv::Point>, cv::Size img_bounds);
 			// vector<cv::Vec2f> adjustLines(const vector<Vec2f> &houghLines, const double& rot_angle);
+			void visualizePredToGT (const pcXYZRGBPtr & IoU);
 
 	};
 

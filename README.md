@@ -33,6 +33,21 @@ cd ..
 
 6. Check the results in your output folder. You may use CloudCompare to visualize the point cloud and use AutoCAD or [ShareCAD](https://beta.sharecad.org/) to visualize the dxf files.
 
+## Dependecies
+# ROOT Package
+
+```
+$ git clone --branch latest-stable --depth=1 https://github.com/root-project/root.git root_src
+$ mkdir root_build root_install && cd root_build
+$ cmake -DCMAKE_INSTALL_PREFIX=../root_install -DCMAKE_CXX_STANDARD=11 ../root_src # && check cmake configuration output for warnings or errors
+$ cmake --build . -- install -j4 # if you have 4 cores available for compilation
+$ source ../root_install/bin/thisroot.sh # or thisroot.{fish,csh}
+
+```
+
+# GSL-GNU
+sudo apt-get install libgsl-dev
+
 ------
 ### Citation
 

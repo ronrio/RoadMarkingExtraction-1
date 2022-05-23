@@ -30,6 +30,7 @@ namespace roadmarking
 	{
 		float lx, ly, lz;
 		int ix, iy;
+		
 		lx = boundingbox.max_x - boundingbox.min_x;
 		ly = boundingbox.max_y - boundingbox.min_y;
 		lz = boundingbox.max_z - boundingbox.min_z;
@@ -49,6 +50,11 @@ namespace roadmarking
 		if(nx * ny > 2e7)
 			cout<<"Warning: Too much grid map, the system may run out of memory."<<endl;
 
+		//Copy Original point cloud to another with ground truth are shown in red
+		pcGT = pcXYZRGBPtr(new pcXYZRGB());
+		pcl::copyPointCloud(*c, *pcGT);
+
+
 		CMatrixIndice.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
 		CMatrixIndiceWithGT.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
 		//Saving cv::Point indices 
@@ -58,6 +64,8 @@ namespace roadmarking
 			iy = (int)((c->points[i].y - minY) / resolution);
 			CMatrixIndice[ix][iy].push_back(i);
 			CMatrixIndiceWithGT[ix][iy].push_back(GT[i]); //Labels are saved the same order as the PC
+			if(GT[i] == 1)
+				pcGT->points[i].g = 255;
 		}
         c.reset(new pcXYZI()); //free the memory
         
@@ -231,7 +239,7 @@ namespace roadmarking
 		std::cout << "============meani /= Number_non_zero_pixel;===============" << std::endl;
 		std::cout << "the number of non zero pixel : " << Number_non_zero_pixel << std::endl;
 		std::cout << "the mean value : " << meani << std::endl;
-
+		
 		for (int i = 0; i < nx; i++)
 		{
 			for (int j = 0; j < ny; j++)
@@ -444,9 +452,11 @@ namespace roadmarking
 		int classNo = 0;
 
 		outclouds.resize(totallabel - 1);
-
+		
 		timin = 0;
 		tjmin = 0;
+		
+		int count_pixels = 0, count_points = 0;
 
 		for (int i = timin; i < timin + img.rows; i++)
 		{
@@ -477,6 +487,7 @@ namespace roadmarking
 					}
 					else
 					{
+						count_pixels++; count_points += GCMatrixIndice[i][j].size();
 						if (outclouds[pixelValue - 2].size() == 0)
 							outclouds[pixelValue - 2].points.push_back(incloud->points[GCMatrixIndice[i][j][0]]); 
 					}
@@ -490,6 +501,8 @@ namespace roadmarking
 				classNo++;
 		}
 		//cout << "Cloud Number: " << classNo << endl;
+		cout << "Number of rejected points :  " << count_points << endl;
+		cout << "Number of rejected pixels :  " << count_pixels << endl;
 	}
 
 	void Imageprocess::img2pclabel_c(const cv::Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ)
@@ -1157,7 +1170,7 @@ namespace roadmarking
 			}
 		}
 
-		vector<cv::Vec2f> houghLines = intensityHoughLineDetector(255 * img_fill,HC);
+		/*vector<cv::Vec2f> houghLines = intensityHoughLineDetector(255 * img_fill,HC);
 
 		// Transform the image into a horizontal Orientation
 		cv::Vec2f trajectory_line = houghLines[0];
@@ -1166,7 +1179,7 @@ namespace roadmarking
 		cout << "Vehicle trajectory cv::line : " << trajectory_line << endl;
 
 		img_h = rotateFrame(255 * img_fill, houghLines);
-		vector<vector<cv::Point>> polyList_idx = getNonZeroIdx(houghLines, img_h, off_y, off_x);
+		vector<vector<cv::Point>> polyList_idx = getNonZeroIdx(houghLines, img_h, off_y, off_x);*/
 	}
 
 	void Imageprocess::DetectCornerShiTomasi(const cv::Mat &src, const cv::Mat &colorlabel, cv::Mat &cornerwithimg, int minDistance, double qualityLevel)
@@ -1798,8 +1811,10 @@ namespace roadmarking
 				//Check if the centroid is already the center of this round.
 				//TODO: What would happen if the blob is black
 				win_start_y += windows_n_cols;
-				
-				if(p.y != 0 || p.x != 0){
+				// Bounding conditions for the centroid
+				bool v_bound = (p.y > 0) && (p.y < src.rows); //Vertical Bound
+				bool h_bound = (p.x > 0) && (p.y < src.cols); //Horizontal Bound
+				if(v_bound || h_bound){
 					int off_shift = p.y - off_x; //Shift accordingly upwards if the diff is negative, vice versa if downwards
 					win_start_x += off_shift;
 					mass_center.x = win_start_y - off_y;
@@ -1816,15 +1831,15 @@ namespace roadmarking
 				src(marking_win) = 0; disp_src(marking_win) = 0; // Set already processed region to zero so we won't accumlate them again.	
 			}
 			// testPolyFit(img_h, idxList[line_i]);
-			vector<cv::Point> fitRes = robustFitting(idxList[line_i], src.size());
-			for(size_t i =0; i < fitRes.size(); i++){
-				cout << "Fit Point : " << fitRes[i] << endl;
-			}
-			cv::polylines(disp_src, fitRes, false, cv::Scalar(0,255,0),2);
+			// vector<cv::Point> fitRes = robustFitting(idxList[line_i], src.size());
+			// for(size_t i =0; i < fitRes.size(); i++){
+			// 	cout << "Fit Point : " << fitRes[i] << endl;
+			// }
+			cv::polylines(disp_src, idxList[line_i], false, cv::Scalar(0,255,0),2);
 			cv::Mat disp_tmp;
 			// resize(disp_src, disp_tmp, cv::Size(), 0.25, 0.25, cv::INTER_LINEAR);
-			cv::imshow("PolyLine result", disp_src);
-			cv::waitKey();
+			//cv::imshow("PolyLine result", disp_src);
+			//cv::waitKey();
 		}
 		return idxList;
 	}
@@ -1942,133 +1957,154 @@ namespace roadmarking
 		
 	}
 
-	vector<cv::Point> Imageprocess::robustFitting(vector<cv::Point> data_points, cv::Size img_bounds){
-		double *x;
-		double *y;
-		TVectorD vpar;
-		const size_t n = data_points.size();
-		vector<cv::Point> robust_poly;
+	// vector<cv::Point> Imageprocess::robustFitting(vector<cv::Point> data_points, cv::Size img_bounds){
+	// 	double *x;
+	// 	double *y;
+	// 	TVectorD vpar;
+	// 	const size_t n = data_points.size();
+	// 	vector<cv::Point> robust_poly;
 
-		//Data points to fit
-		x = new double[n];
-		y = new double[n];
+	// 	//Data points to fit
+	// 	x = new double[n];
+	// 	y = new double[n];
 
-		cout << "====== Points before fitting ======" << endl;
-		for (size_t i =0; i < data_points.size(); i++){
-			x[i] = data_points[i].x;
-			y[i] = data_points[i].y;
-			cout << "X,Y " << x[i] << " " << y[i] << endl;
-		}
-		TLinearFitter *lf=new TLinearFitter(1, "pol2");
-		// In order not to save the fitting data
-		lf->StoreData(false); 
-		//TODO: run StoreData(kFALSE) to avoid storing data after fitting
-		lf->AssignData(n, 1, x, y);
-		// 0.7 Fraction for how good is the data used for fitting.
-		lf->EvalRobust(0.7); 
-		lf->PrintResults(3);
-		lf->GetParameters(vpar);
+	// 	cout << "====== Points before fitting ======" << endl;
+	// 	for (size_t i =0; i < data_points.size(); i++){
+	// 		x[i] = data_points[i].x;
+	// 		y[i] = data_points[i].y;
+	// 		cout << "X,Y " << x[i] << " " << y[i] << endl;
+	// 	}
+	// 	TLinearFitter *lf=new TLinearFitter(1, "pol2");
+	// 	// In order not to save the fitting data
+	// 	lf->StoreData(false); 
+	// 	//TODO: run StoreData(kFALSE) to avoid storing data after fitting
+	// 	lf->AssignData(n, 1, x, y);
+	// 	// 0.7 Fraction for how good is the data used for fitting.
+	// 	lf->EvalRobust(0.7); 
+	// 	lf->PrintResults(3);
+	// 	lf->GetParameters(vpar);
 
-		// Extract coefficient of the fit
-		double a = vpar[2], b = vpar[1], c = vpar[0];
+	// 	// Extract coefficient of the fit
+	// 	double a = vpar[2], b = vpar[1], c = vpar[0];
 
-		// Adjust the par[0] to be bounded by the Y val
-		double x_bound = img_bounds.width, y_bound = img_bounds.height;
+	// 	// Adjust the par[0] to be bounded by the Y val
+	// 	double x_bound = img_bounds.width, y_bound = img_bounds.height;
 		
-		// define the x limit for the polynomial
-		double x_start = 0, x_end = x_bound;
-		cout << "The Bound of the X is " << x_bound << endl;
-		for (size_t i = 0; i < vpar.GetNoElements(); i++){
-			cout << "The coofficient values are : " << vpar[i] << endl;
-		}
-		// Solve for the roots of the polynomial so we can bound our solution
-		// When y = y_bound
-		double c1 = c - y_bound;
-		ROOT::Math::Polynomial poly(a, b, c1);
-		std::vector<double> sol_real = poly.FindRealRoots();
-		//TODO:: Order the results and take the one in the 
-		for(size_t i=0; i < sol_real.size(); i++)
-			if (sol_real[i] > 0)
-			{
-				if(sol_real[i] < x_start)
-				{	
-					x_start = sol_real[i];
-				}
-				else
-				{
-					if(sol_real[i] < x_bound)
-					{
-						if (sol_real[i] > x_end)
-						{
-							x_end = sol_real[i];
-						}
-					}
-				}
-			}
+	// 	// define the x limit for the polynomial
+	// 	double x_start = 0, x_end = x_bound;
+	// 	cout << "The Bound of the X is " << x_bound << endl;
+	// 	for (size_t i = 0; i < vpar.GetNoElements(); i++){
+	// 		cout << "The coofficient values are : " << vpar[i] << endl;
+	// 	}
+	// 	// Solve for the roots of the polynomial so we can bound our solution
+	// 	// When y = y_bound
+	// 	double c1 = c - y_bound;
+	// 	ROOT::Math::Polynomial poly(a, b, c1);
+	// 	std::vector<double> sol_real = poly.FindRealRoots();
+	// 	//TODO:: Order the results and take the one in the 
+	// 	for(size_t i=0; i < sol_real.size(); i++)
+	// 		if (sol_real[i] > 0)
+	// 		{
+	// 			if(sol_real[i] < x_start)
+	// 			{	
+	// 				x_start = sol_real[i];
+	// 			}
+	// 			else
+	// 			{
+	// 				if(sol_real[i] < x_bound)
+	// 				{
+	// 					if (sol_real[i] > x_end)
+	// 					{
+	// 						x_end = sol_real[i];
+	// 					}
+	// 				}
+	// 			}
+	// 		}
 
-		//Second Bound: When y = 0
-		poly = ROOT::Math::Polynomial(a , b, c);
-		sol_real = poly.FindRealRoots();
-		for(size_t i=0; i < sol_real.size(); i++)
-			if (sol_real[i] > 0)
-			{
-				if(sol_real[i] < x_start)
-				{	
-					x_start = sol_real[i];
-				}
-				else
-				{
-					if(sol_real[i] < x_bound)
-					{
-						if (sol_real[i] > x_end)
-						{
-							x_end = sol_real[i];
-						}
-					}
-				}
-			}
+	// 	//Second Bound: When y = 0
+	// 	poly = ROOT::Math::Polynomial(a , b, c);
+	// 	sol_real = poly.FindRealRoots();
+	// 	for(size_t i=0; i < sol_real.size(); i++)
+	// 		if (sol_real[i] > 0)
+	// 		{
+	// 			if(sol_real[i] < x_start)
+	// 			{	
+	// 				x_start = sol_real[i];
+	// 			}
+	// 			else
+	// 			{
+	// 				if(sol_real[i] < x_bound)
+	// 				{
+	// 					if (sol_real[i] > x_end)
+	// 					{
+	// 						x_end = sol_real[i];
+	// 					}
+	// 				}
+	// 			}
+	// 		}
 
-		// Estimate test point for X: X_START:20:X_END
-		vector<double> x_test = linspace(x_start, x_end, 20);
-		poly = ROOT::Math::Polynomial(a, b, c);
-		for (size_t i =0; i < x_test.size(); i++){
-			double y, dy;
-			cv::Point data_point;
-			poly.FdF(x_test[i], y, dy);
-			data_point.x = cvRound(x_test[i]);
-			data_point.y = cvRound(y);
-			robust_poly.push_back(data_point);
-		}
-		return robust_poly;
-	}
+	// 	// Estimate test point for X: X_START:20:X_END
+	// 	vector<double> x_test = linspace(x_start, x_end, 20);
+	// 	poly = ROOT::Math::Polynomial(a, b, c);
+	// 	for (size_t i =0; i < x_test.size(); i++){
+	// 		double y, dy;
+	// 		cv::Point data_point;
+	// 		poly.FdF(x_test[i], y, dy);
+	// 		data_point.x = cvRound(x_test[i]);
+	// 		data_point.y = cvRound(y);
+	// 		robust_poly.push_back(data_point);
+	// 	}
+	// 	return robust_poly;
+	// }
+
+
 	void Imageprocess::EvaluateLaneMarkings(const cv::Mat & imgFilled){
-		CMatrixIndiceWithPred.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
 		size_t TP = 0, TN = 0, FP = 0, FN = 0;
-		size_t tot_marks = 0;
+		//Copy Original point cloud to another with ground truth are shown in red
 		for (size_t i = timin; i < timin + imgFilled.rows; i++)
 		{
 			for (size_t j = tjmin; j < tjmin + imgFilled.cols; j++)
 			{
 				if (imgFilled.at<uchar>(i - timin, j - tjmin) == 1)
 				{
-					for (int k = 0; k < CMatrixIndiceWithGT[i][j].size(); k++)
+					for (int k = 0; k < CMatrixIndiceWithGT[i][j].size(); k++){
+						size_t pointIdx = CMatrixIndice[i][j][k];
+						pcGT->points[pointIdx].r = 255;
 						if (CMatrixIndiceWithGT[i][j][k] == 1)
 							++TP;
 						else
 							++FP;
+							
+							}
 				}
 				else{
-						for (int k = 0; k < CMatrixIndiceWithGT[i][j].size(); k++)
+						for (int k = 0; k < CMatrixIndiceWithGT[i][j].size(); k++){
 							if (CMatrixIndiceWithGT[i][j][k] == 1)
 								++FN;
 							else
 								++TN;
+								
+							}
 				}
 			}
 		}
 		cout << "TP, TN, FP, FN : " << to_string(TP) << " , " << to_string(TN) << " , " << to_string(FP) << " , " << to_string(FN) << " , " << endl;
 		double IoU = TP / double(TP + FP + FN);
 		cout << "IoU : " << IoU << endl;
-		cout << "Total number of marking points: " << tot_marks << endl;
+		visualizePredToGT (pcGT);
+	}
+
+	void Imageprocess::visualizePredToGT (const pcXYZRGBPtr & IoU){
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("IoU Result Cloud"));
+		viewer->setBackgroundColor(255, 255, 255);
+		viewer->addPointCloud(IoU, "IoU Cloud");
+		//viewer->addPointCloud(pred_pc, "Prediction Cloud");
+		cout << "Click X(close) to continue..." << endl;
+		while (!viewer->wasStopped())
+		{
+			viewer->spinOnce(100);
+			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+		}
+
 	}
 }

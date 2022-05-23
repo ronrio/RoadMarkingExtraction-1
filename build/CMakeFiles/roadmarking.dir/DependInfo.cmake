@@ -1,66 +1,22 @@
+
+# Consider dependencies only in project.
+set(CMAKE_DEPENDS_IN_PROJECT_ONLY OFF)
+
 # The set of languages for which implicit dependencies are needed:
 set(CMAKE_DEPENDS_LANGUAGES
-  "CXX"
-  )
-# The set of files for implicit dependencies of each language:
-set(CMAKE_DEPENDS_CHECK_CXX
-  "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/src/data_io.cpp" "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/build/CMakeFiles/roadmarking.dir/src/data_io.cpp.o"
-  "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/src/dl_dxf.cpp" "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/build/CMakeFiles/roadmarking.dir/src/dl_dxf.cpp.o"
-  "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/src/dl_writer_ascii.cpp" "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/build/CMakeFiles/roadmarking.dir/src/dl_writer_ascii.cpp.o"
-  "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/src/ground_extraction.cpp" "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/build/CMakeFiles/roadmarking.dir/src/ground_extraction.cpp.o"
-  "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/src/imageprocess.cpp" "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/build/CMakeFiles/roadmarking.dir/src/imageprocess.cpp.o"
-  "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/src/modelmatch.cpp" "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/build/CMakeFiles/roadmarking.dir/src/modelmatch.cpp.o"
-  "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/src/pointcloudprocess.cpp" "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/build/CMakeFiles/roadmarking.dir/src/pointcloudprocess.cpp.o"
-  "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/test/roadmarking_main.cpp" "/Users/noorio/Downloads/Spring_22/Projects/RoadMarkingExtraction/build/CMakeFiles/roadmarking.dir/test/roadmarking_main.cpp.o"
-  )
-set(CMAKE_CXX_COMPILER_ID "GNU")
-
-# Preprocessor definitions for this target.
-set(CMAKE_TARGET_DEFINITIONS_CXX
-  "QT_CORE_LIB"
-  "QT_GUI_LIB"
-  "QT_NO_DEBUG"
-  "QT_WIDGETS_LIB"
-  "vtkFiltersFlowPaths_AUTOINIT=1(vtkFiltersParallelFlowPaths)"
-  "vtkIOExodus_AUTOINIT=1(vtkIOParallelExodus)"
-  "vtkIOGeometry_AUTOINIT=1(vtkIOMPIParallel)"
-  "vtkIOImage_AUTOINIT=1(vtkIOMPIImage)"
-  "vtkIOParallel_AUTOINIT=1(vtkIOMPIParallel)"
-  "vtkIOSQL_AUTOINIT=2(vtkIOMySQL,vtkIOPostgreSQL)"
-  "vtkRenderingContext2D_AUTOINIT=1(vtkRenderingContextOpenGL)"
-  "vtkRenderingCore_AUTOINIT=3(vtkInteractionStyle,vtkRenderingFreeType,vtkRenderingOpenGL)"
-  "vtkRenderingFreeType_AUTOINIT=2(vtkRenderingFreeTypeFontConfig,vtkRenderingMatplotlib)"
-  "vtkRenderingLIC_AUTOINIT=1(vtkRenderingParallelLIC)"
-  "vtkRenderingVolume_AUTOINIT=1(vtkRenderingVolumeOpenGL)"
   )
 
-# The include file search paths:
-set(CMAKE_CXX_TARGET_INCLUDE_PATH
-  "/usr/include/eigen3"
-  "/usr/include/vtk-6.3"
-  "/usr/include/freetype2"
-  "/usr/lib/aarch64-linux-gnu/openmpi/include/openmpi"
-  "/usr/lib/aarch64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent"
-  "/usr/lib/aarch64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent/include"
-  "/usr/lib/aarch64-linux-gnu/openmpi/include"
-  "/usr/include/python2.7"
-  "/usr/include/aarch64-linux-gnu"
-  "/usr/include/hdf5/openmpi"
-  "/usr/include/libxml2"
-  "/usr/include/jsoncpp"
-  "/usr/include/tcl"
-  "/usr/include/pcl-1.8"
-  "/usr/include/ni"
-  "/usr/include/openni2"
-  "/usr/local/include/opencv4"
-  "../include"
-  "../include/dxflib"
-  "/usr/include/aarch64-linux-gnu/qt5"
-  "/usr/include/aarch64-linux-gnu/qt5/QtWidgets"
-  "/usr/include/aarch64-linux-gnu/qt5/QtGui"
-  "/usr/include/aarch64-linux-gnu/qt5/QtCore"
-  "/usr/lib/aarch64-linux-gnu/qt5/mkspecs/linux-g++"
-  "/usr/local/include"
+# The set of dependency files which are needed:
+set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/home/nabdyj/Downloads/RoadMarkingExtraction-1/src/data_io.cpp" "CMakeFiles/roadmarking.dir/src/data_io.cpp.o" "gcc" "CMakeFiles/roadmarking.dir/src/data_io.cpp.o.d"
+  "/home/nabdyj/Downloads/RoadMarkingExtraction-1/src/dl_dxf.cpp" "CMakeFiles/roadmarking.dir/src/dl_dxf.cpp.o" "gcc" "CMakeFiles/roadmarking.dir/src/dl_dxf.cpp.o.d"
+  "/home/nabdyj/Downloads/RoadMarkingExtraction-1/src/dl_writer_ascii.cpp" "CMakeFiles/roadmarking.dir/src/dl_writer_ascii.cpp.o" "gcc" "CMakeFiles/roadmarking.dir/src/dl_writer_ascii.cpp.o.d"
+  "/home/nabdyj/Downloads/RoadMarkingExtraction-1/src/ground_extraction.cpp" "CMakeFiles/roadmarking.dir/src/ground_extraction.cpp.o" "gcc" "CMakeFiles/roadmarking.dir/src/ground_extraction.cpp.o.d"
+  "/home/nabdyj/Downloads/RoadMarkingExtraction-1/src/imageprocess.cpp" "CMakeFiles/roadmarking.dir/src/imageprocess.cpp.o" "gcc" "CMakeFiles/roadmarking.dir/src/imageprocess.cpp.o.d"
+  "/home/nabdyj/Downloads/RoadMarkingExtraction-1/src/modelmatch.cpp" "CMakeFiles/roadmarking.dir/src/modelmatch.cpp.o" "gcc" "CMakeFiles/roadmarking.dir/src/modelmatch.cpp.o.d"
+  "/home/nabdyj/Downloads/RoadMarkingExtraction-1/src/pointcloudprocess.cpp" "CMakeFiles/roadmarking.dir/src/pointcloudprocess.cpp.o" "gcc" "CMakeFiles/roadmarking.dir/src/pointcloudprocess.cpp.o.d"
+  "/home/nabdyj/Downloads/RoadMarkingExtraction-1/src/polyfit.cpp" "CMakeFiles/roadmarking.dir/src/polyfit.cpp.o" "gcc" "CMakeFiles/roadmarking.dir/src/polyfit.cpp.o.d"
+  "/home/nabdyj/Downloads/RoadMarkingExtraction-1/test/roadmarking_main.cpp" "CMakeFiles/roadmarking.dir/test/roadmarking_main.cpp.o" "gcc" "CMakeFiles/roadmarking.dir/test/roadmarking_main.cpp.o.d"
   )
 
 # Targets to which this target links.

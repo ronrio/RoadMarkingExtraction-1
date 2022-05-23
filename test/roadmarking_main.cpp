@@ -20,22 +20,22 @@ int main(int argc, char *argv[])
         return (-1);
     }
     std::string inputFilePath = argv[1];
-    std::string outputFolderPath = argv[2];
+    std::string gt_file = argv[2];
+    std::string outputFolderPath = argv[3];
     std::string model_path = "./model_pool/models_urban_example/";
     std::string parm_file = "./config/parameter_urban_example.txt";
-    std::string gt_file = "./sample_data/Toronto_samp_2_Habeeebi.txt";
 
-    if (argc == 3)
-        printf("Model pool path and configuration file are not specified, use the default model pool and parameters.\n");
     if (argc == 4)
+        printf("Model pool path and configuration file are not specified, use the default model pool and parameters.\n");
+    if (argc == 5)
     {
-        model_path = argv[3];
+        model_path = argv[4];
         printf("Configuration file is not specified, use the default parameters.\n");
     }
-    if (argc >= 5)
+    if (argc >= 6)
     {
-        model_path = argv[3];
-        parm_file = argv[4];
+        model_path = argv[4];
+        parm_file = argv[5];
     }
 
     /*-------------------------------------------------Readme----------------------------------------------------*/
@@ -264,9 +264,9 @@ int main(int argc, char *argv[])
     // Apply morpholofical operation here as 
     imgIbinary = ip.maxEntropySegMentation(imgIgradientroad);
     // dilate_element = getStructuringElement(MORPH_RECT, Size(5, 5));
-    // open_element = getStructuringElement(MORPH_RECT, Size(3, 3));
+    //open_element = getStructuringElement(MORPH_RECT, Size(3, 3));
     // dilate(imgIbinary, imgIbinary, dilate_element);
-    // morphologyEx(imgIbinary, imgIbinary, MORPH_CLOSE, open_element);
+    //morphologyEx(imgIbinary, imgIbinary, MORPH_CLOSE, open_element);
     // imwrite("Open_morph_imgIbinary.png", imgIbinary);
 
     // resize(imgIbinary, imgBTmp, Size(), 0.15, 0.15, INTER_LINEAR);
@@ -310,25 +310,35 @@ int main(int argc, char *argv[])
 
     //Step 6. 2D->3D back to point cloud
     //ip.img2pc_g(colorLabelImg, gcloud, outcloud);                //Ground Road Marking Points (All in one)
-    ip.img2pclabel_g(labelImg, gcloud, outclouds, resolution / 5); //Ground Road Marking Points (Segmentation) //Elevation filter: the last parameter is set as the dZ threshold for single pixel
-    
-    ip.EvaluateLaneMarkings(imgFilled);
+    ip.img2pclabel_g(labelImg, gcloud, outclouds, resolution / 5 ); // resolution / 5 //Ground Road Marking Points (Segmentation) //Elevation filter: the last parameter is set as the dZ threshold for single pixel
 
+    /*cout << "The total number of clusters found are : " << outclouds.size() << endl;
+    for(size_t i = 0; i < outclouds.size(); i++){
+        cout << "Number of points in cluster " << i << " are " << outclouds[i].size() << endl;
+    }*/
+    
     //Use Otsu (Intensity) Method and Statistics Outlier Remover to filter the point cloud
     seg.cloudFilter(outclouds, outcloud_otsu_sor, 256, 10, 2.5); // Three parameters: the first is for the histogram level of Otsu Thresholding , the second is for SOR neighbor number and the third is for SOR std threshold
+
+    // Evaluate the marking using the intensity threshold of the Otsu method
+    ip.EvaluateLaneMarkings(imgFilled);
 
     //Delete point clouds whose point number is less than a threshold
     if (datatype == 1)
         seg.NFilter(outcloud_otsu_sor, outcloud_otsu_sor_n, density / 15); //the last parameter is set as the point number threshold for each cloud
     else
-        seg.NFilter(outcloud_otsu_sor, outcloud_otsu_sor_n, 10);
+        seg.NFilter(outcloud_otsu_sor, outcloud_otsu_sor, 10);
+
+     // Update ground truth point cloud with predicted points
+    seg.getClassificationResult(ip.pcGT, outcloud_otsu_sor_n);
 
     cout << "Roadmarking pixels --> roadmarking point cloud done.\n";
 
     //Step 7. Object Recognition and Classification based on Model Matching and Geometric Information
     //7.1 Boundary and Corner Extraction (Optional)
     // Boundary Extraction: Alpha-Shape Concave Hull Generation
-    seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, 2, 0.7);
+    seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, ip.pcGT, 1, 1);
+    seg.EstimateEndPoints(ip.pcGT, boundaryclouds);
     // Corner Extraction: Neighborhood Processing
     // seg.CornerExtraction(boundaryclouds,cornerclouds,1,8,0.1,0.02,0.95); // Parameters: 1/0 Use Radius Search or KNN, 8, KNN's K, 0.15 search radius , 0.02 distance threshold, 0.94 maxcos
     cout << "Find [" << boundaryclouds.size() << "] candidate roadmarkings\n";
@@ -342,6 +352,15 @@ int main(int argc, char *argv[])
     else if (roadtype == 2)
         seg.CategoryJudgementBox_cityroad(boundingfeatures, roadmarkings);
     cout << "Roadmarking rough classification done\n";
+
+    // Extract dash line markings only
+    std::vector<int> dash_idx;
+    for (int i=0; i < roadmarkings.size(); i++){
+        //if(roadmarkings[i].category == 2 || roadmarkings[i].category == 1){
+            dash_idx.push_back(i);
+        //}
+    }
+    seg.VisualizeStart_EndBB(boundingdatas, dash_idx, ip.pcGT);
 
     //7.3 Road Markings (Arrow) Classification based on Model Matching (Relatively Slow, You may try other faster 2D feature and matching strategy)
     cout << "Begin model matching.\n";

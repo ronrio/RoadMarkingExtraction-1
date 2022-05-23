@@ -12,12 +12,12 @@ IF(APPLE)
 ENDIF()
 
 
-SET(CMAKE_CXX_FLAGS "-O3 -std=c++11 -w -fopenmp -pthread ")
-SET(CMAKE_C_FLAGS "-O3 -std=c++11 -fopenmp -pthread ")
+SET(CMAKE_CXX_FLAGS "-O3 -std=c++11 -w -fopenmp -pthread")
+SET(CMAKE_C_FLAGS "-O3 -std=c++11 -fopenmp -pthread")
 
 # SET(CMAKE_BUILD_TYPE "Debug") 
-# SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
-# SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
+# SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -lm -ggdb")
+# SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -lm -Wall")
 
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
