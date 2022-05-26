@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     std::string outputFolderPath = argv[3];
     std::string model_path = "./model_pool/models_urban_example/";
     std::string parm_file = "./config/parameter_urban_example.txt";
-    bool IS_SPARSE = true;
+    bool IS_SPARSE = false;
 
     if (argc == 4)
         printf("Model pool path and configuration file are not specified, use the default model pool and parameters.\n");
@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
 
     //Step 6. 2D->3D back to point cloud
     //ip.img2pc_g(colorLabelImg, gcloud, outcloud);                //Ground Road Marking Points (All in one)
-    ip.img2pclabel_g(labelImg, gcloud, outclouds, resolution / 5); // resolution / 5, 0.2 //Ground Road Marking Points (Segmentation) //Elevation filter: the last parameter is set as the dZ threshold for single pixel
+    ip.img2pclabel_g(labelImg, gcloud, outclouds, 0.2); // resolution / 5, 0.2 //Ground Road Marking Points (Segmentation) //Elevation filter: the last parameter is set as the dZ threshold for single pixel
 
     /*cout << "The total number of clusters found are : " << outclouds.size() << endl;
     for(size_t i = 0; i < outclouds.size(); i++){

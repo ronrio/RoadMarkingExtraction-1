@@ -155,7 +155,7 @@ namespace roadmarking
 		//Otsu method thresholding
 		int i;
 #pragma omp parallel for private(i) //Multi-thread
-		for (int i = 0; i < cloudnumber; i++)
+		for (i = 0; i < cloudnumber; i++)
 		{
 			//store intensity [integer] 
 			vector<int>  intensitylist;
