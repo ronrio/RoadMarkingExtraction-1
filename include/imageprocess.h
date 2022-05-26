@@ -45,10 +45,11 @@ namespace roadmarking
 		  void pcgrid(Bounds &boundingbox, float resolution);                   
 		  
 		  void savepcgrid(Bounds &boundingbox, float resolution, const pcXYZIPtr &c);   
-		  void savepcgrid(Bounds &boundingbox, float resolution,  pcXYZIPtr &c,  pcXYZIPtr &gc, pcXYZIPtr &ngc, vector<int> GT_labels);   
+		  void savepcgrid(Bounds &boundingbox, float resolution,  pcXYZIPtr &c,  pcXYZIPtr &gc, pcXYZIPtr &ngc, const pcXYZRGBPtr& GT);
+		  void savepcgrid(Bounds &boundingbox, float resolution,  pcXYZIPtr &c,  pcXYZIPtr &gc, pcXYZIPtr &ngc);   
 		  void pc2imgI(const pcXYZIPtr &cloud, int whatcloud,  cv::Mat &img, float times_std);         //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud]; //times_std: maxI = meanI+ times_std*stdI
 		  void pc2imgZ(const pcXYZIPtr &cloud, int whatcloud,  cv::Mat &img);                          //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud]
-		  void pc2imgD(const pcXYZIPtr &cloud, int whatcloud,  cv::Mat &img ,float k);                 //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud] k:expected max cv::Point number in a pixel
+		  void pc2imgD(const pcXYZIPtr &cloud, int whatcloud,  cv::Mat &img ,float k);                 //whatcloud[ 0: Original Cloud , 1: Ground Cloud , 2: Non-ground Cloud] k:expected max point number in a pixel
 		 
 		  void img2pc_g(const cv::Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr & outcloud);  
 		  void img2pc_c(const cv::Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr & outcloud);  
@@ -92,7 +93,7 @@ namespace roadmarking
 		  vector<vector<cv::Point>> getNonZeroIdx(vector<cv::Vec2f> houghLines, cv::Mat img_h, int off_y, int off_x);
 
 		  // Label PC in Filttered intensity image 2 for marking and 0 eitherwise
-		  void EvaluateLaneMarkings(const cv::Mat & imgFilled);
+		  void EvaluateLaneMarkings(const cv::Mat & imgFilled, pcXYZRGBPtr& pcGT);
 		  int nx, ny; //pixel number
 		  int timin, tjmin; //truncated pixel no.
 		  float minX, minY, minZ;  //bounding box minimum value

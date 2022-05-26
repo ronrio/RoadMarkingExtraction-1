@@ -24,6 +24,7 @@ int main(int argc, char *argv[])
     std::string outputFolderPath = argv[3];
     std::string model_path = "./model_pool/models_urban_example/";
     std::string parm_file = "./config/parameter_urban_example.txt";
+    bool IS_SPARSE = true;
 
     if (argc == 4)
         printf("Model pool path and configuration file are not specified, use the default model pool and parameters.\n");
@@ -73,7 +74,8 @@ int main(int argc, char *argv[])
     is_road_extracted = 0; //not extracted
 
     io.readParalist(parm_file);
-    io.readGroundTruth(gt_file);
+    if(!IS_SPARSE)
+        io.readGroundTruth(gt_file);
 
     roadtype = io.paralist.road_type;
     float density = io.paralist.expected_point_num_per_m_square;
@@ -92,9 +94,11 @@ int main(int argc, char *argv[])
 
     //Step 1
     pcXYZIPtr cloud(new pcXYZI());   // Original point clouds
+    Csegmentation seg(resolution);   // Define cloud processing object
     vector<double> CloudBoundingBox; // Xmin,Ymin,Zmin,Xmax,Ymax,Zmax after translation for Input point cloud;
     Bounds bound_3d_temp;
     double X_origin =0.0, Y_origin=0.0; // X,Y origin before translation;
+    pcXYZRGBPtr pcGT(new pcXYZRGB());
     
     //Step 2,3
     pcXYZIPtr fcloud(new pcXYZI());  // Sampled point cloud
@@ -106,6 +110,10 @@ int main(int argc, char *argv[])
     
     //Step 5
     Mat imgImf, imgIgradient, imgIgradientroad, imgIbinary, imgZgradient, imgZbinary, imgDbinary, imgIbfilter, labelImg, colorLabelImg, imgFilled, Timg, dilateImg, closeImg, corner, cornerwithimg;
+
+    //Dash marking endpoint list for Ground Truth and Predictions
+    vector<DashMarking> gtMarks, predMarks;
+
     /* imgImf: Intensity Projection Image after Median Filter ;
        imgIgradient: Intensity Gradient Image ;
     // imgIgradientroad: Road's Intensity Gradient Image ;
@@ -132,6 +140,7 @@ int main(int argc, char *argv[])
     vector<vector<pcl::PointXYZI>> boundingdatas, modeldatas;            // Unit of Road markings' bounding box and model datas
     vector<BoundingFeature> boundingfeatures;                            // Unit of Road markings' bounding box feature
     vector<bool> is_rights;                                              // Unit of Arrow Road markings' direction
+    
 
     //Step 1. Data Import
     string extension = inputFilePath.substr(inputFilePath.find_last_of('.') + 1); //Get the suffix of the file;
@@ -139,11 +148,15 @@ int main(int argc, char *argv[])
         io.readLasFile(inputFilePath, *cloud, bound_3d_temp);
     else if (!strcmp(extension.c_str(), "pcd"))
         {
-            io.readPcdFile(inputFilePath, cloud, bound_3d_temp);
-            std::cout << "The name of the loaded file is : "
-                    << filename
-                    << std::endl;
-            // io.displayRoadwithIntensities(cloud, 0.5, 0, 20, filename);  //  Display Road Point Cloud with their respective intensities
+            if(!IS_SPARSE){
+                io.readPcdFile(inputFilePath, cloud, pcGT, bound_3d_temp);
+                std::cout << "The name of the loaded file is : "
+                        << filename
+                        << std::endl;
+                gtMarks = seg.EstimateEndPointsGT(pcGT, cloud, io.groundTruth.groundTruthVals);
+            }
+            else
+                io.readPcdFile(inputFilePath, cloud, bound_3d_temp);
         }
     else 
         printf("Unrecognized data format. Please use *.pcd or *.las format point cloud.\n");
@@ -179,7 +192,7 @@ int main(int argc, char *argv[])
     //Method 2: PMF (Slow)
     //seg.GroundFilter_PMF(cloud[i], gcloud, ngcloud);
 
-    Csegmentation seg(resolution);
+    //Csegmentation seg(resolution);
     //Preprocessing: Segmentation and Fitting (Optional)
     //RANSAC plane segmentation
     /*pcXYZIPtr fitcloud(new pcXYZI());
@@ -193,7 +206,13 @@ int main(int argc, char *argv[])
 
     //Step 4. 3D->2D projection, Generating Projection Image
     Imageprocess ip;
-    ip.savepcgrid(bound_3d_temp, resolution, cloud, gcloud, ngcloud, io.groundTruth.groundTruthVals); //get image size and save point indices in each pixel
+    // Extract the ground truth endpoints
+    if(!IS_SPARSE){
+        ip.savepcgrid(bound_3d_temp, resolution, cloud, gcloud, ngcloud, pcGT); //get image size and save point indices in each pixel
+        cout << "Number of dash markings in the dataset are " << gtMarks.size() << endl;
+    }
+    else
+        ip.savepcgrid(bound_3d_temp, resolution, cloud, gcloud, ngcloud);
     //For better efficiency (without ground segmentation), you can replace gcloud and ngcloud with cloud
     //[0:Original Cloud, 1 : Ground Cloud, 2 : Non - ground Cloud]
     // Image 1
@@ -310,7 +329,7 @@ int main(int argc, char *argv[])
 
     //Step 6. 2D->3D back to point cloud
     //ip.img2pc_g(colorLabelImg, gcloud, outcloud);                //Ground Road Marking Points (All in one)
-    ip.img2pclabel_g(labelImg, gcloud, outclouds, resolution / 5 ); // resolution / 5 //Ground Road Marking Points (Segmentation) //Elevation filter: the last parameter is set as the dZ threshold for single pixel
+    ip.img2pclabel_g(labelImg, gcloud, outclouds, resolution / 5); // resolution / 5, 0.2 //Ground Road Marking Points (Segmentation) //Elevation filter: the last parameter is set as the dZ threshold for single pixel
 
     /*cout << "The total number of clusters found are : " << outclouds.size() << endl;
     for(size_t i = 0; i < outclouds.size(); i++){
@@ -321,7 +340,8 @@ int main(int argc, char *argv[])
     seg.cloudFilter(outclouds, outcloud_otsu_sor, 256, 10, 2.5); // Three parameters: the first is for the histogram level of Otsu Thresholding , the second is for SOR neighbor number and the third is for SOR std threshold
 
     // Evaluate the marking using the intensity threshold of the Otsu method
-    ip.EvaluateLaneMarkings(imgFilled);
+    if(!IS_SPARSE)
+        ip.EvaluateLaneMarkings(imgFilled, pcGT);
 
     //Delete point clouds whose point number is less than a threshold
     if (datatype == 1)
@@ -330,15 +350,66 @@ int main(int argc, char *argv[])
         seg.NFilter(outcloud_otsu_sor, outcloud_otsu_sor, 10);
 
      // Update ground truth point cloud with predicted points
-    seg.getClassificationResult(ip.pcGT, outcloud_otsu_sor_n);
+    // seg.getClassificationResult(ip.pcGT, outcloud_otsu_sor_n);
 
     cout << "Roadmarking pixels --> roadmarking point cloud done.\n";
 
     //Step 7. Object Recognition and Classification based on Model Matching and Geometric Information
     //7.1 Boundary and Corner Extraction (Optional)
     // Boundary Extraction: Alpha-Shape Concave Hull Generation
-    seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, ip.pcGT, 1, 1);
-    seg.EstimateEndPoints(ip.pcGT, boundaryclouds);
+    if(!IS_SPARSE){
+        seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, pcGT, 1, 0.5);
+        predMarks = seg.EstimateEndPoints(pcGT, boundaryclouds);
+        cout << "Number of dash markings predicted are " << predMarks.size() << endl;
+
+        // Estimate the Cost Matrix
+        vector<vector<double>> costMatrix;
+        costMatrix.resize(predMarks.size(), vector<double>(gtMarks.size()));
+        for(int i = 0; i < predMarks.size(); i++){
+            for(int j = 0; j < gtMarks.size(); j++){
+                //TODO:What would be a cost function ? False positive affect the assignment process so bad 
+                costMatrix[i][j] = pcl::squaredEuclideanDistance(predMarks[i].startPoint, gtMarks[j].startPoint) + pcl::squaredEuclideanDistance(predMarks[i].endPoint, gtMarks[j].endPoint);
+            }
+        }
+
+        HungarianAlgorithm HungAlgo;
+        vector<int> assignment;
+
+        double cost = HungAlgo.Solve(costMatrix, assignment);
+
+        boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Matching Result"));
+        viewer->setBackgroundColor(255, 255, 255);
+
+        for (unsigned int x = 0; x < costMatrix.size(); x++)
+        {
+            float r = (rand() / (1.0 + RAND_MAX));
+            float g = (rand() / (1.0 + RAND_MAX)); 
+            float b = (rand() / (1.0 + RAND_MAX));
+
+            viewer->addSphere(predMarks[x].startPoint, 0.2, r, g, b, "Start Point:" + to_string(x));
+            viewer->addSphere(predMarks[x].endPoint, 0.2, r, g, b, "End Point:" + to_string(x));
+
+            viewer->addSphere(gtMarks[assignment[x]].startPoint, 0.2, r, g, b, "Start PointGT:" + to_string(assignment[x]));
+            viewer->addSphere(gtMarks[assignment[x]].endPoint, 0.2, r, g, b, "End PointGT:" + to_string(assignment[x]));
+
+            viewer->addLine(predMarks[x].startPoint, predMarks[x].endPoint, 1.0, 0.0, 0.0, "Pred Segment" + to_string(x));
+            viewer->addLine(gtMarks[assignment[x]].startPoint, gtMarks[assignment[x]].endPoint, 0.5, 1.0, 0.25, "GT Segment" + to_string(assignment[x]));
+        }
+
+        viewer->addPointCloud(pcGT, "PointCloud Reference");
+        cout << "Click X(close) to continue..." << endl;
+            while (!viewer->wasStopped())
+            {
+                viewer->spinOnce(100);
+                boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+            }
+
+        std::cout << "\ncost: " << cost << std::endl;
+    }
+    else
+        seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, 1, 0.5);
+
+
     // Corner Extraction: Neighborhood Processing
     // seg.CornerExtraction(boundaryclouds,cornerclouds,1,8,0.1,0.02,0.95); // Parameters: 1/0 Use Radius Search or KNN, 8, KNN's K, 0.15 search radius , 0.02 distance threshold, 0.94 maxcos
     cout << "Find [" << boundaryclouds.size() << "] candidate roadmarkings\n";
@@ -353,14 +424,8 @@ int main(int argc, char *argv[])
         seg.CategoryJudgementBox_cityroad(boundingfeatures, roadmarkings);
     cout << "Roadmarking rough classification done\n";
 
-    // Extract dash line markings only
-    std::vector<int> dash_idx;
-    for (int i=0; i < roadmarkings.size(); i++){
-        //if(roadmarkings[i].category == 2 || roadmarkings[i].category == 1){
-            dash_idx.push_back(i);
-        //}
-    }
-    seg.VisualizeStart_EndBB(boundingdatas, dash_idx, ip.pcGT);
+    //if(!IS_SPARSE)
+    //seg.VisualizeStart_EndBB(boundingdatas, dash_idx, pcGT);
 
     //7.3 Road Markings (Arrow) Classification based on Model Matching (Relatively Slow, You may try other faster 2D feature and matching strategy)
     cout << "Begin model matching.\n";

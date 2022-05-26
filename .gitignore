@@ -4,6 +4,7 @@ pcds_out
 sample_data
 0015_sync_pcd/*
 build
+bin/roadmarking
 
 # Prerequisites
 *.d
@@ -51,3 +52,5 @@ build
 
 #.PCD
 *.pcd
+
+.vscode

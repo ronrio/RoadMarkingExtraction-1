@@ -62,6 +62,12 @@ namespace roadmarking
 
 	};
 
+	struct DashMarking
+	{
+		pcl::PointXYZI startPoint;
+		pcl::PointXYZI endPoint;
+	};
+
 	struct Bounds
 	{
 		double min_x;

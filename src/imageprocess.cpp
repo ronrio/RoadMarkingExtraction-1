@@ -23,10 +23,10 @@ namespace roadmarking
 
 		res = resolution;
 
-		cout << "Image cv::Size: " << nx << " * " << ny << endl;
+		cout << "Image Size: " << nx << " * " << ny << endl;
 	}
 
-	void Imageprocess::savepcgrid(Bounds &boundingbox, float resolution, pcXYZIPtr &c, pcXYZIPtr &gc, pcXYZIPtr &ngc, vector<int> GT)
+	void Imageprocess::savepcgrid(Bounds &boundingbox, float resolution, pcXYZIPtr &c, pcXYZIPtr &gc, pcXYZIPtr &ngc, const pcXYZRGBPtr& GT)
 	{
 		float lx, ly, lz;
 		int ix, iy;
@@ -45,7 +45,7 @@ namespace roadmarking
 		nx = lx / resolution + 1;
 		ny = ly / resolution + 1;
 
-		cout << "Image cv::Size: " << nx << " x " << ny << endl;
+		cout << "Image Size: " << nx << " x " << ny << endl;
 
 		if(nx * ny > 2e7)
 			cout<<"Warning: Too much grid map, the system may run out of memory."<<endl;
@@ -63,9 +63,65 @@ namespace roadmarking
 			ix = (int)((c->points[i].x - minX) / resolution);
 			iy = (int)((c->points[i].y - minY) / resolution);
 			CMatrixIndice[ix][iy].push_back(i);
-			CMatrixIndiceWithGT[ix][iy].push_back(GT[i]); //Labels are saved the same order as the PC
-			if(GT[i] == 1)
-				pcGT->points[i].g = 255;
+			int label;
+			if(GT->points[i].g == 255)
+				label = 1;
+			else
+				label = 0;
+			CMatrixIndiceWithGT[ix][iy].push_back(label); //Labels are saved the same order as the PC
+		}
+        c.reset(new pcXYZI()); //free the memory
+        
+	    GCMatrixIndice.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
+		NGCMatrixIndice.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
+
+		for (int i = 0; i < gc->points.size(); i++)
+		{
+			ix = (int)((gc->points[i].x - minX) / resolution);
+			iy = (int)((gc->points[i].y - minY) / resolution);
+			GCMatrixIndice[ix][iy].push_back(i);
+		}
+		for (int i = 0; i < ngc->points.size(); i++)
+		{
+			ix = (int)((ngc->points[i].x - minX) / resolution);
+			iy = (int)((ngc->points[i].y - minY) / resolution);
+			NGCMatrixIndice[ix][iy].push_back(i);
+		}
+		cout << "gridding of the environment is done !! " << endl;
+	}
+
+	void Imageprocess::savepcgrid(Bounds &boundingbox, float resolution, pcXYZIPtr &c, pcXYZIPtr &gc, pcXYZIPtr &ngc)
+	{
+		float lx, ly, lz;
+		int ix, iy;
+		
+		lx = boundingbox.max_x - boundingbox.min_x;
+		ly = boundingbox.max_y - boundingbox.min_y;
+		lz = boundingbox.max_z - boundingbox.min_z;
+
+		minX = -0.5 * lx;
+		minY = -0.5 * ly;
+		minZ = -0.5 * lz;
+
+		// cout << lx << "," << ly << "," << lz << endl;
+		// cout << boundingbox.max_x << "," << boundingbox.max_y << "," << boundingbox.max_z << endl;
+
+		nx = lx / resolution + 1;
+		ny = ly / resolution + 1;
+
+		cout << "Image Size: " << nx << " x " << ny << endl;
+
+		if(nx * ny > 2e7)
+			cout<<"Warning: Too much grid map, the system may run out of memory."<<endl;
+
+
+		CMatrixIndice.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
+		//Saving cv::Point indices 
+		for (int i = 0; i < c->points.size(); i++)
+		{
+			ix = (int)((c->points[i].x - minX) / resolution);
+			iy = (int)((c->points[i].y - minY) / resolution);
+			CMatrixIndice[ix][iy].push_back(i);
 		}
         c.reset(new pcXYZI()); //free the memory
         
@@ -103,7 +159,7 @@ namespace roadmarking
 
 		res = resolution;
 
-		cout << "Image cv::Size: " << nx << " * " << ny << endl;
+		cout << "Image Size: " << nx << " * " << ny << endl;
 
 		CMatrixIndice.resize(nx);
 
@@ -221,18 +277,18 @@ namespace roadmarking
 		minMaxLoc(matIntensities, &minVal, &maxVal, &minLoc, &maxLoc );
 		cout << "Min Val of intensities: " << minVal << endl;
 		cout << "Max Val of intensities: " << maxVal << endl;
-		resize(matIntensities, matIntensities, cv::Size(), 0.75, 0.75, cv::INTER_LINEAR);
-		// cv::imshow("Intensity Image Plot ", matIntensities);
-
-		for (int i = 0; i < nx; i++)
+		/*resize(matIntensities, matIntensities, cv::Size(), 0.75, 0.75, cv::INTER_LINEAR);
+		cv::imshow("Intensity Image Plot ", matIntensities);
+		cv::waitKey(0);*/
+	for (int i = 0; i < nx; i++)
 		{
 			for (int j = 0; j < ny; j++)
 			{
-				// if (ave[i][j] > 1) 
-				// {
+				if (ave[i][j] > 1) 
+				{
 					meani += ave[i][j];
 					Number_non_zero_pixel++;
-				// }
+				}
 			}
 		}
 		meani /= Number_non_zero_pixel;
@@ -244,10 +300,10 @@ namespace roadmarking
 		{
 			for (int j = 0; j < ny; j++)
 			{
-				// if (ave[i][j] > 1)
-				// {
+				if (ave[i][j] > 1)
+				{
 					stdi += (ave[i][j] - meani) * (ave[i][j] - meani);
-				// }
+				}
 			}
 		}
 
@@ -269,7 +325,7 @@ namespace roadmarking
 			}
 		}
 		// cv::imshow("Intensity image after scaling", img);
-		// visualizeIntensityHistogram(img);
+		visualizeIntensityHistogram(img);
 		// cv::waitKey();
 	}
 
@@ -392,7 +448,7 @@ namespace roadmarking
 		//else maxnum = expectedmaxnum;
 		maxnum = expected_max_point_num_in_a_pixel;
 
-		cout << "max cv::Point number: "<<maxnum<<endl;
+		cout << "max point number: "<<maxnum<<endl;
 		for (size_t i = 0; i < nx; i++)
 		{
 			for (size_t j = 0; j < ny; j++)
@@ -1352,7 +1408,6 @@ namespace roadmarking
 		cv::resize(imgI, imgI_down, cv::Size(WIDTH, HEIGHT), cv::INTER_LINEAR);
 
 		cv::imwrite("Intensity_scales_hist.png", histImage );
-		cv::waitKey();
 	}
 	void Imageprocess::intensityLineSegmentDetector(const cv::Mat & imgI){
 
@@ -2058,7 +2113,7 @@ namespace roadmarking
 	// }
 
 
-	void Imageprocess::EvaluateLaneMarkings(const cv::Mat & imgFilled){
+	void Imageprocess::EvaluateLaneMarkings(const cv::Mat & imgFilled, pcXYZRGBPtr& pcGT){
 		size_t TP = 0, TN = 0, FP = 0, FN = 0;
 		//Copy Original point cloud to another with ground truth are shown in red
 		for (size_t i = timin; i < timin + imgFilled.rows; i++)
@@ -2091,7 +2146,7 @@ namespace roadmarking
 		cout << "TP, TN, FP, FN : " << to_string(TP) << " , " << to_string(TN) << " , " << to_string(FP) << " , " << to_string(FN) << " , " << endl;
 		double IoU = TP / double(TP + FP + FN);
 		cout << "IoU : " << IoU << endl;
-		visualizePredToGT (pcGT);
+		visualizePredToGT(pcGT);
 	}
 
 	void Imageprocess::visualizePredToGT (const pcXYZRGBPtr & IoU){

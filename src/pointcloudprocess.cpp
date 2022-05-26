@@ -106,10 +106,10 @@ namespace roadmarking
 				if (inlier_Point.x == )
 			}*/
 		}
-		std::sort(pcGT->points.begin(), pcGT->points.end(), comparePoint);
+		/*std::sort(pcGT->points.begin(), pcGT->points.end(), comparePoint);
 		auto unique_end = std::unique(pcGT->points.begin(), pcGT->points.end(), equalPoint);
 		pcGT->points.erase(unique_end, pcGT->points.end());
-		cout << "After adding marking clouds, the size of the original ground truth point cloud is : " << pcGT->points.size() << endl;
+		cout << "After adding marking clouds, the size of the original ground truth point cloud is : " << pcGT->points.size() << endl;*/
 		viewer->addPointCloud(pcGT, "GT Cloud");
 		cout << "Click X(close) to continue..." << endl;
 		while (!viewer->wasStopped())
@@ -146,7 +146,6 @@ namespace roadmarking
 	void Csegmentation::cloudFilter(const vector<pcXYZI> &inclouds, vector<pcXYZI> &outSORclouds, int N, int MeanK, double std)
 	{
 		int cloudnumber = inclouds.size();
-        cout<< "Candidate segement number: "<< cloudnumber<<endl;
 
 		vector<pcXYZI> outclouds;
 
@@ -156,18 +155,20 @@ namespace roadmarking
 		//Otsu method thresholding
 		int i;
 #pragma omp parallel for private(i) //Multi-thread
-		for (i = 0; i < cloudnumber; i++)
+		for (int i = 0; i < cloudnumber; i++)
 		{
 			//store intensity [integer] 
 			vector<int>  intensitylist;
 			int pointnumber = inclouds[i].size();
 			intensitylist.resize(pointnumber);
+			
 			for (int j = 0; j < pointnumber; j++)
 			{
 				intensitylist[j] = inclouds[i].points[j].intensity;   
 			}
 			int intensitymax, intensitymin;
 			intensitymax = *(max_element(intensitylist.begin(), intensitylist.end()));
+		
 			//intensitymin = *(min_element(intensitylist.begin(), intensitylist.end()));
 
 			//OTSU Method
@@ -177,7 +178,7 @@ namespace roadmarking
 			vector<float> h;
 			h0.resize(N);
 			h.resize(N);
-
+			
 			for (int k = 0; k < N; k++) h0[k] = 0;
 
 			//generate histogram
@@ -189,6 +190,7 @@ namespace roadmarking
 			for (int k = 0; k < N; k++)
 			{
 				h[k] = (float)h0[k] / pointnumber;
+
 			}
 
 			int threshold = 0;
@@ -224,7 +226,7 @@ namespace roadmarking
 				}
 			}
 
-			// cout << "Threshold : "<<threshold<< endl;
+			//cout << "Threshold : "<<threshold<< endl;
 			for (int j = 0; j < pointnumber; j++)
 			{
 				int bin = (N - 1) * intensitylist[j] / intensitymax;
@@ -1208,7 +1210,7 @@ namespace roadmarking
 		*/
 	}
 	// https://stackoverflow.com/questions/59395218/pcl-scale-two-point-clouds-to-the-same-size
-	void Csegmentation::EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds){
+	vector<DashMarking> Csegmentation::EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds){
 	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("End points Cloud"));
 	viewer->setBackgroundColor(255, 255, 255);
     pcl::PCA<pcl::PointXYZI> pca;
@@ -1216,6 +1218,8 @@ namespace roadmarking
 	pcl::PointXYZI MeanPoint, StartPoint, EndPoint;
 	pcl::PointXYZI goldenMin, goldenMax;
 	pcXYZI projected;
+	vector<pcl::PointXYZI> startPoints, endPoints;
+	vector<DashMarking> dashPoints;
 
     for(int i = 0; i < boundaryclouds.size(); i++){
 		if(boundaryclouds[i].size() > 3){ //This is important for SVD to work, limiting on more points should be applicable as well.
@@ -1224,13 +1228,61 @@ namespace roadmarking
 		pca.project(boundaryclouds[i], projected);
 
     	pcl::getMinMax3D(projected, goldenMin, goldenMax);
-		pca.reconstruct(goldenMin, StartPoint);
-		pca.reconstruct(goldenMax, EndPoint);
 
-		viewer->addSphere(StartPoint, 0.2, 1.0, 0.0, 0.0, "Start Point:" + to_string(i));
-    	viewer->addSphere(EndPoint, 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
+		//Get the reference aspect ratio of a dashed marking
+		double lv = 4; 
+
+		if (pca.getEigenValues()[1] < lv)
+		{
+			double dy = goldenMax.y - goldenMin.y;
+
+			// Get the mid value of the secondry axis of the PCA
+			goldenMin.y = goldenMin.y + dy / 2.0;
+			goldenMax.y = goldenMin.y;
+			cout << "Get the variance in the second axis: " << pca.getEigenValues()[1] << endl;
+			pca.reconstruct(goldenMin, StartPoint);
+			pca.reconstruct(goldenMax, EndPoint);
+
+			//viewer->addSphere(StartPoint, 0.2, 1.0, 0.0, 0.0, "Start Point:" + to_string(i));
+    		//viewer->addSphere(EndPoint, 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
+			startPoints.push_back(StartPoint);
+			endPoints.push_back(EndPoint);
+			}	
 		}
     }
+	cout << "Number of endpoint detected :  " << startPoints.size() << endl;
+	double ld = 1;
+	int close_lines = 0;
+	for(int i = 0; i < endPoints.size()-1; i++){
+		for(int j = i+1; j < startPoints.size(); j++){
+			double dist = pcl::squaredEuclideanDistance(endPoints[i], startPoints[j]);
+			if(dist < ld)
+			{
+				endPoints[i] = endPoints[j];
+				startPoints.erase(startPoints.begin()+j);
+				endPoints.erase(endPoints.begin()+j);
+				j--;
+				close_lines++;
+			}
+		}
+	}
+	// Filter segments that does not look like dashed markings
+	double lb1 = 2, lb2 = 4;
+	for(int i = 0; i < startPoints.size(); i++){
+		pca.project(startPoints[i], goldenMin);
+		pca.project(endPoints[i], goldenMax);
+		double dx = goldenMax.x -  goldenMin.x;
+		if (dx < lb1 || dx > lb2){
+			startPoints.erase(startPoints.begin()+i);
+			endPoints.erase(endPoints.begin()+i);
+			i--;
+		}
+	}
+
+	for(int i = 0; i < startPoints.size(); i++){
+		viewer->addSphere(startPoints[i], 0.2, 1.0, 0.0, 0.0, "Start Point:" + to_string(i));
+    	viewer->addSphere(endPoints[i], 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
+	}
 	viewer->addPointCloud(pcGT, "PointCloud Reference");
     cout << "Click X(close) to continue..." << endl;
 		while (!viewer->wasStopped())
@@ -1238,7 +1290,55 @@ namespace roadmarking
 			viewer->spinOnce(100);
 			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
 		}
+	for(int i = 0; i < startPoints.size(); i++){
+			DashMarking dashLine;
+			dashLine.startPoint = startPoints[i];
+			dashLine.endPoint = endPoints[i];
+			dashPoints.push_back(dashLine);
+		}
+		return dashPoints;
+	}
+
+	vector<DashMarking> Csegmentation::EstimateEndPointsGT(pcXYZRGBPtr pcGT, const pcXYZIPtr &cloud, const vector<int> &gtLabels){
+		pcXYZIPtr markingC(new pcXYZI());
+		vector<pcXYZI> markingsGT, boundaryclouds;
 		
+		for(int i = 0; i < cloud->points.size(); i++){
+			if(gtLabels[i] == 1) // Marking Point
+				markingC->points.push_back(cloud->points[i]);
+		}
+		
+		// Apply Eculidean Clustering
+		// Creating the KdTree object for the search method of the extraction
+ 		pcl::search::KdTree<pcl::PointXYZI>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZI>);
+		tree->setInputCloud (markingC);
+		std::vector<pcl::PointIndices> cluster_indices;
+
+		pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
+		ec.setClusterTolerance (0.3); // 2cm
+		ec.setMinClusterSize (100);
+		ec.setMaxClusterSize (25000);
+		ec.setSearchMethod (tree);
+		ec.setInputCloud (markingC);
+		ec.extract (cluster_indices);
+
+		int j = 0;
+		int num_cluster = cluster_indices.end () - cluster_indices.begin(); //Get the total number of clusters 
+		markingsGT.resize(num_cluster);
+		cout << "number of clusters :" << num_cluster << endl;
+		for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end(); ++it){
+			pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZI>);
+			for (const auto& idx : it->indices)
+				cloud_cluster->push_back ((*markingC)[idx]);
+			cloud_cluster->width = cloud_cluster->size ();
+			cloud_cluster->height = 1;
+			cloud_cluster->is_dense = true;
+			markingsGT[j].points = cloud_cluster->points;
+			j++;
+  		}
+
+		BoundaryExtraction(markingsGT, boundaryclouds, pcGT, 1, 1);
+		return EstimateEndPoints(pcGT, boundaryclouds);
 	}
 
 
@@ -1247,7 +1347,7 @@ namespace roadmarking
 		boundaryclouds.resize(clouds.size());
 		int i;
 		//#pragma omp parallel for private(i) //Multi-thread
-
+		cout << "number of boundry clouds :" << boundaryclouds.size() << endl;
 		for (i = 0; i < clouds.size(); i++)
 		{
 			boundaryclouds[i] = alphashape(clouds[i], resolution*alpha_value_scale); //this is the parameter for alpha-shape, very important
@@ -1262,8 +1362,29 @@ namespace roadmarking
 			tempcloud->points.swap(boundaryclouds[i].points);
 		}
 		// pcXYZRGBPtr boundC(new pcXYZRGB);
-		// visualizeConcaveHullBoundries(pcGT, boundaryclouds);
+		//visualizeConcaveHullBoundries(pcGT, boundaryclouds);
 		//cout << "Boundary Extraction Done" << endl;
+	}
+
+	void Csegmentation::BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds , int down_rate, float alpha_value_scale)
+	{
+		boundaryclouds.resize(clouds.size());
+		int i;
+		//#pragma omp parallel for private(i) //Multi-thread
+		cout << "number of boundry clouds :" << boundaryclouds.size() << endl;
+		for (i = 0; i < clouds.size(); i++)
+		{
+			boundaryclouds[i] = alphashape(clouds[i], resolution*alpha_value_scale); //this is the parameter for alpha-shape, very important
+
+			//Downsampling
+			pcXYZIPtr tempcloud(new pcXYZI);
+			for (int j = 0; j < boundaryclouds[i].points.size(); j++)
+			{
+				if (j % down_rate == 0)
+					tempcloud->points.push_back(boundaryclouds[i].points[j]);
+			}
+			tempcloud->points.swap(boundaryclouds[i].points);
+		}
 	}
 
 	void Csegmentation::visualizeConcaveHullBoundries(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds){

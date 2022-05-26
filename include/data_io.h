@@ -107,6 +107,7 @@ namespace roadmarking
 
 		//pcd file
 		bool readPcdFile(const string &fileName, const pcXYZIPtr &pointCloud);
+		bool readPcdFile(const string &fileName, const pcXYZIPtr &pointCloud, pcXYZRGBPtr &pcGT, Bounds &bound_3d);
 		bool readPcdFile(const string &fileName, const pcXYZIPtr &pointCloud, Bounds &bound_3d);
 		bool writePcdFile(const string &fileName, const pcXYZIPtr &pointCloud);
 		bool writePcdFile(const string &fileName, const pcXYZRGBPtr &pointCloud);

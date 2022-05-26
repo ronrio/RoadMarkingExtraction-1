@@ -2,19 +2,21 @@
 #define SEGMENTATION_H
 
 #include "utility.h"
+#include "Hungarian.h"
 #include <cfloat>
 
 #include <pcl/visualization/common/common.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/common/io.h>
 #include <pcl/common/pca.h>
+#include <pcl/segmentation/extract_clusters.h>
 
 using namespace std;
 
 namespace roadmarking
 {
 	struct {
-        bool operator()(pcl::PointXYZRGB p1, pcl::PointXYZRGB p2) const {
+        bool operator()(pcl::PointXYZI p1, pcl::PointXYZI p2) const {
 			if (p1.x != p2.x)
 				return p1.x > p2.x;
 			else if (p1.y != p2.y)
@@ -25,7 +27,7 @@ namespace roadmarking
     } comparePoint;
 
 	struct {
-        bool operator()(pcl::PointXYZRGB p1, pcl::PointXYZRGB p2) const {
+        bool operator()(pcl::PointXYZI p1, pcl::PointXYZI p2) const {
    		 if (p1.x == p2.x && p1.y == p2.y && p1.z == p2.z)
         	return true;
     	return false;
@@ -50,6 +52,7 @@ namespace roadmarking
 		void BoundingInformation(const vector<pcXYZI> &clouds, vector<vector<pcl::PointXYZI>> & boundingdatas); //bounding 4 points 
 		void BoundingFeatureCalculation(const vector<vector<pcl::PointXYZI>> & boundingdatas, vector<BoundingFeature> & boundingfeatures); //bounding 4 points
 		void BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, pcXYZRGBPtr pcGT, int down_rate=1, float alpha_value_scale = 0.8);                 
+		void BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, int down_rate=1, float alpha_value_scale = 0.8);                 
 		void CornerExtraction(const vector<pcXYZI> &boundaryclouds, vector<pcXYZI> &cornerclouds, bool UseRadius, int K, float radius, float dis_threshold, float maxcos);     
 		
 		void CategoryJudgementBox_highway(const vector<BoundingFeature> & boundingfeatures, RoadMarkings & roadmarkings);
@@ -75,7 +78,8 @@ namespace roadmarking
 		// https://stackoverflow.com/questions/34481190/removing-duplicates-of-3d-points-in-a-vector-in-c
 
 		void getClassificationResult(pcXYZRGBPtr pcGT, const vector<pcXYZI> &outclouds);
-		void EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds);
+		vector<DashMarking> EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds);
+		vector<DashMarking> EstimateEndPointsGT(pcXYZRGBPtr pcGT, const pcXYZIPtr &cloud, const vector<int> &gtLabels);
 
 		
 	protected:

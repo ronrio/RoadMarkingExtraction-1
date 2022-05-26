@@ -45,7 +45,7 @@ namespace roadmarking
 			cout << "Failed to open the Ground truth file !!" << endl;
 		while (!infile.eof())
 		{
-			size_t val;
+			int val;
 			infile >> val;
 			//Only load classes for markings and set the rest to be 0
 			if (val != 2)
@@ -399,7 +399,7 @@ namespace roadmarking
 		return true;
 	}
 
-	bool DataIo::readPcdFile(const std::string &fileName, const pcXYZIPtr &pointCloud, Bounds &bound_3d)
+	bool DataIo::readPcdFile(const std::string &fileName, const pcXYZIPtr &pointCloud, pcXYZRGBPtr &pcGT, Bounds &bound_3d)
 	{
 		pcl::console::setVerbosityLevel(pcl::console::L_ALWAYS); //Ban pcl warnings
 		// To extract the inliers === Having intensity value above 0.3 value
@@ -417,8 +417,8 @@ namespace roadmarking
 		std::cout << "Loaded Points Before filtering: "
                 << pointCloud->points.size()
                 << std::endl;
-
-		for (int i = 0; i < pointCloud->points.size(); i++)
+		
+		/*for (int i = 0; i < pointCloud->points.size(); i++)
 		{
 			float iAvg = 0.5;
 			//TODO: Differentiate in the configuration between Scans with scale of 1 and scale of 255 !!
@@ -428,7 +428,7 @@ namespace roadmarking
 				// Manual filtering point cloud
 				// inliers->indices.push_back(i);
 			}
-		}
+		}*/
 		// Manual filtering point cloud
 		// extract.setInputCloud(pointCloud);
 		// extract.setIndices(inliers);
@@ -450,6 +450,78 @@ namespace roadmarking
 			pointCloud->points[i].x -= (0.5*(bound_3d.min_x+bound_3d.max_x));
 			pointCloud->points[i].y -= (0.5*(bound_3d.min_y+bound_3d.max_y));
 		}
+
+		pcl::copyPointCloud(*pointCloud, *pcGT);
+		for (int i = 0; i < pcGT->points.size(); i++)
+		{
+			if(this->groundTruth.groundTruthVals[i] == 1)
+				pcGT->points[i].g = 255;
+		}
+
+		return true;
+	}
+	bool DataIo::readPcdFile(const std::string &fileName, const pcXYZIPtr &pointCloud, Bounds &bound_3d)
+	{
+		pcl::console::setVerbosityLevel(pcl::console::L_ALWAYS); //Ban pcl warnings
+		// To extract the inliers === Having intensity value above 0.3 value
+		// TODO: Integrate it for KITTI solution
+		pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+		pcl::ExtractIndices<pcl::PointXYZI> extract;
+		//intensity should be stored as 'intensity' (lower case i) field instead of 'Intensity' in the pcd file
+		//reference: http://www.danielgm.net/cc/forum/viewtopic.php?t=4540
+		if (pcl::io::loadPCDFile<pcl::PointXYZI>(fileName, *pointCloud) == -1) //* load the file
+		{
+			PCL_ERROR("Couldn't read file\n");
+			return false;
+		}
+
+		std::cout << "Loaded Points Before filtering: "
+                << pointCloud->points.size()
+                << std::endl;
+		
+		double intensityMax = -DBL_MAX;
+		for (int i = 0; i < pointCloud->points.size(); i++)
+		{
+			if(pointCloud->points[i].intensity > intensityMax)
+				intensityMax = pointCloud->points[i].intensity;
+
+			/*float iAvg = 0.5;
+			//TODO: Differentiate in the configuration between Scans with scale of 1 and scale of 255 !!
+			if (pointCloud->points[i].intensity >= iAvg && pointCloud->points[i].intensity < 1.0)  // e.g. remove all pts below iAvg
+			{
+				pointCloud->points[i].intensity *= 100;
+				// Manual filtering point cloud
+				// inliers->indices.push_back(i);
+			}*/
+		}
+		// Manual filtering point cloud
+		// extract.setInputCloud(pointCloud);
+		// extract.setIndices(inliers);
+		// extract.setNegative(false);
+		// extract.filter(*pointCloud);
+
+		//Scaling the intensity values into 256 scale values
+		for (int i = 0; i < pointCloud->points.size(); i++)
+		{
+			pointCloud->points[i].intensity = 255 * (pointCloud->points[i].intensity / intensityMax) ;
+		}
+    
+		
+		std::cout << "Loaded Points After filtering: "
+                << pointCloud->points.size()
+                << std::endl;
+		if (pointCloud->points[0].intensity==0) //check if the intensity exist
+			printf("Warning! Point cloud intensity may not be imported properly, check the scalar field's name.\n");
+		getCloudBound(pointCloud, bound_3d);
+		
+
+		//shift the center point to the origin of the coordinate system
+		for (int i=0; i<pointCloud->size(); i++) 
+	    {
+			pointCloud->points[i].x -= (0.5*(bound_3d.min_x+bound_3d.max_x));
+			pointCloud->points[i].y -= (0.5*(bound_3d.min_y+bound_3d.max_y));
+		}
+
 		return true;
 	}
 
