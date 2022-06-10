@@ -7,6 +7,7 @@
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/filters/voxel_grid.h>
 
 
 #include <liblas/liblas.hpp>
@@ -69,7 +70,11 @@ namespace roadmarking
 
 			float sideline_vector_distance = 4.5;
 			bool visualization_on = false;
+
 			HoughConfig HC;
+
+			bool IS_SPARSE = false;
+    		bool SHOW_DISTANCE = true;
 		};
 
 		struct GroundTruth{
@@ -153,7 +158,7 @@ namespace roadmarking
 
 		//display
 		void displayroad(const pcXYZIPtr &ngcloud, const pcXYZIPtr &gcloud);
-		void displayGroundwithIntensities(const pcXYZIPtr &gcloud, const float &intensity_limit, const float &elevation_limit);
+		void displayGroundwithIntensities(const pcXYZIPtr &gcloud, const vector<DashMarking> & marks);
 		void displayRoadwithIntensities(const pcXYZIPtr &road_cloud, const float &intensity_limit, const float &elevation_limit, const float &y_range, const string &filename);
 		void displaymark(const vector<pcXYZI> &clouds);
 		void displaymarkwithng(const vector<pcXYZI> &clouds, const pcXYZIPtr &ngcloud);

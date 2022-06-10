@@ -48,6 +48,16 @@ typedef  pcl::PointCloud<pcl::PointXYZINormal>      PointXYZI_Normal;
 
 namespace roadmarking
 {
+
+	struct DashMarkProps{
+		double cost;
+		double startCost;
+		double endCost;
+		double orthoAvgCost;
+		double HeadAvgCost;
+		double angle;
+	};
+
 	struct CenterPoint
 	{
 		double x;

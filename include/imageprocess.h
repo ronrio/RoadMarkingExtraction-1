@@ -17,10 +17,10 @@
 #include <boost/filesystem.hpp>
 
 //ROOT
-/*#include <TLinearFitter.h>
+#include <TLinearFitter.h>
 #include <TMatrixT.h>
 #include <Math/RootFinder.h>
-#include <Math/Polynomial.h>*/
+#include <Math/Polynomial.h>
 // #include <SpecFuncCephes.h>
 
 //opencv
@@ -70,7 +70,7 @@ namespace roadmarking
 		  
 		  void ImgReverse(const cv::Mat &img, cv::Mat &img_reverse);                            
 		  void ImgFilling(const cv::Mat &img, cv::Mat &img_fill);
-		  void ImgFilling(const cv::Mat &img, cv::Mat &img_fill, HoughConfig HC);                            
+		  void ImgFilling(const cv::Mat &img, cv::Mat &img_fill, HoughConfig HC, bool IS_SPARSE);                            
 
 		  void LabelColor(const cv::Mat & _labelImg, cv::Mat & _colorImg);                     
 		  cv::Scalar GetRandomColor();                                                      
@@ -90,10 +90,11 @@ namespace roadmarking
 		  void applyPrespectiveTransform(const cv::Mat &img, Bounds& bounds);
 
 		  // Extract Pixel indices for polynomial fitting
-		  vector<vector<cv::Point>> getNonZeroIdx(vector<cv::Vec2f> houghLines, cv::Mat img_h, int off_y, int off_x);
+		  cv::Mat getNonZeroIdx(vector<cv::Vec2f> houghLines, cv::Mat img_h, int off_y, int off_x);
 
 		  // Label PC in Filttered intensity image 2 for marking and 0 eitherwise
 		  void EvaluateLaneMarkings(const cv::Mat & imgFilled, pcXYZRGBPtr& pcGT);
+		  void generatePredictionPC(const cv::Mat & imgFilled, const pcXYZIPtr &cloud, pcXYZRGBPtr& pcPred);
 		  int nx, ny; //pixel number
 		  int timin, tjmin; //truncated pixel no.
 		  float minX, minY, minZ;  //bounding box minimum value
@@ -120,7 +121,8 @@ namespace roadmarking
 			vector<cv::Point> returnHoughWindowContour(const cv::Size& imgBounds, const cv::Vec2f & line, const size_t & houghWinOffset);
 			vector<cv::Point> calcLineToImgBounds(const cv::Size& imgBounds, const cv::Vec2f & line);
 			vector<cv::Point> returnHoughLineBound(const cv::Size& imgBounds, const cv::Vec2f &line, int window_width);
-			cv::Mat rotateFrame(cv::Mat img, vector<cv::Vec2f> & houghLines);			
+			cv::Mat rotateFrame(const cv::Mat &img, vector<cv::Vec2f> & houghLines);
+			cv::Mat recoverImg(const cv::Mat &img, const cv::Size &orig_dims, const double &rot_angle_in_degrees);			
 			// Re-ordering the contor
 			template< class T >
 			void reorder(vector<T> &v, vector<size_t> const &order )  {   

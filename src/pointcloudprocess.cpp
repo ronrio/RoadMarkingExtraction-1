@@ -226,7 +226,7 @@ namespace roadmarking
 				}
 			}
 
-			//cout << "Threshold : "<<threshold<< endl;
+			//cout << "Threshold : "<< threshold << endl;
 			for (int j = 0; j < pointnumber; j++)
 			{
 				int bin = (N - 1) * intensitylist[j] / intensitymax;
@@ -1221,25 +1221,27 @@ namespace roadmarking
 	vector<pcl::PointXYZI> startPoints, endPoints;
 	vector<DashMarking> dashPoints;
 
+	vector<int> bc;
     for(int i = 0; i < boundaryclouds.size(); i++){
-		if(boundaryclouds[i].size() > 3){ //This is important for SVD to work, limiting on more points should be applicable as well.
+		if(boundaryclouds[i].size() > 3){ //This is important for SVD to work, limiting to more points should be applicable as well.
         
 		pca.setInputCloud(boundaryclouds[i].makeShared());
 		pca.project(boundaryclouds[i], projected);
-
-    	pcl::getMinMax3D(projected, goldenMin, goldenMax);
 
 		//Get the reference aspect ratio of a dashed marking
 		double lv = 4; 
 
 		if (pca.getEigenValues()[1] < lv)
 		{
+			pcl::getMinMax3D(projected, goldenMin, goldenMax);
+
 			double dy = goldenMax.y - goldenMin.y;
 
 			// Get the mid value of the secondry axis of the PCA
 			goldenMin.y = goldenMin.y + dy / 2.0;
 			goldenMax.y = goldenMin.y;
-			cout << "Get the variance in the second axis: " << pca.getEigenValues()[1] << endl;
+
+			//cout << "Get the variance in the second axis: " << pca.getEigenValues()[1] << endl;
 			pca.reconstruct(goldenMin, StartPoint);
 			pca.reconstruct(goldenMax, EndPoint);
 
@@ -1247,34 +1249,52 @@ namespace roadmarking
     		//viewer->addSphere(EndPoint, 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
 			startPoints.push_back(StartPoint);
 			endPoints.push_back(EndPoint);
+			
+			//Keep track of cloud idx for fusion process later
+			bc.push_back(i);
+			//cout << "The value of the boundry cloud index " << i << endl;
+
 			}	
 		}
     }
-	cout << "Number of endpoint detected :  " << startPoints.size() << endl;
+	cout << "Number of endpoints detected :  " << startPoints.size() << endl;
+
 	double ld = 1;
 	int close_lines = 0;
-	for(int i = 0; i < endPoints.size()-1; i++){
+	if(startPoints.size() > 0){
+	for(int i = 0; i < startPoints.size()-1; i++){
 		for(int j = i+1; j < startPoints.size(); j++){
-			double dist = pcl::squaredEuclideanDistance(endPoints[i], startPoints[j]);
+			double dist = pcl::euclideanDistance(endPoints[i], startPoints[j]);
+			//cout << "The distance between two endpoints is " << dist << endl;
 			if(dist < ld)
 			{
 				endPoints[i] = endPoints[j];
 				startPoints.erase(startPoints.begin()+j);
 				endPoints.erase(endPoints.begin()+j);
+				bc.erase(bc.begin()+j);
 				j--;
 				close_lines++;
+				}
 			}
 		}
 	}
+
+	cout << "Number of fused markings : " << close_lines << endl;
+
 	// Filter segments that does not look like dashed markings
-	double lb1 = 2, lb2 = 4;
+	double lb1 = 2, lb2 = 5;
 	for(int i = 0; i < startPoints.size(); i++){
+
+		pca.setInputCloud(boundaryclouds[bc[i]].makeShared());
 		pca.project(startPoints[i], goldenMin);
 		pca.project(endPoints[i], goldenMax);
+
 		double dx = goldenMax.x -  goldenMin.x;
+		//cout << "The length of the marking is : " << dx << endl;
 		if (dx < lb1 || dx > lb2){
 			startPoints.erase(startPoints.begin()+i);
 			endPoints.erase(endPoints.begin()+i);
+			bc.erase(bc.begin()+i);
 			i--;
 		}
 	}
@@ -1283,6 +1303,7 @@ namespace roadmarking
 		viewer->addSphere(startPoints[i], 0.2, 1.0, 0.0, 0.0, "Start Point:" + to_string(i));
     	viewer->addSphere(endPoints[i], 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
 	}
+
 	viewer->addPointCloud(pcGT, "PointCloud Reference");
     cout << "Click X(close) to continue..." << endl;
 		while (!viewer->wasStopped())
@@ -1298,6 +1319,250 @@ namespace roadmarking
 		}
 		return dashPoints;
 	}
+
+	double Csegmentation::estimateSinAngleVec3D(const DashMarking& predInst, const DashMarking& GtInst){
+
+		// Calculate the angle between 3D vectors, A  & B
+                pcl::PointXYZI A, B; 
+                A.x = predInst.endPoint.x - predInst.startPoint.x;
+                A.y = predInst.endPoint.y - predInst.startPoint.y;
+                A.z = predInst.endPoint.z - predInst.startPoint.z;
+
+                B.x = GtInst.endPoint.x - GtInst.startPoint.x;
+                B.y = GtInst.endPoint.y - GtInst.startPoint.y;
+                B.z = GtInst.endPoint.z - GtInst.startPoint.z;
+                
+                //Angle = arccos{[(x2 - x1) * (x4 - x3) + (y2 - y1) * (y4 - y3) + (z2 - z1) * (z4 - z3)] / [√((x2 - x1)2 + (y2 - y1)2+ (z2 - z1)2) * √((x4 - x3)2 + (y4 - y3)2 + (z4 - z3)2)]}
+                double cos_angle = (B.x * A.x +  B.y * A.y +  B.z * A.z) / (sqrt( pow(A.x,2) + pow(A.y,2) + pow(A.z,2) ) * sqrt( pow(B.x,2) + pow(B.y,2) + pow(B.z,2) ));
+
+                // make use of identity: sin2(x) + cos2(x) = 1
+                return sqrt(1 - pow(cos_angle, 2));
+	}
+
+	//Estimate the orthogonal distance between a predicted point and a ground truth segment
+	double Csegmentation::estimateOrthogonalCost(const pcl::PointXYZI& predPoint, const DashMarking& gtSegment){
+
+		pcl::PointXY A,B,C;
+
+		//Points on the ground truth segment
+		A.x = gtSegment.startPoint.x;
+		B.x = gtSegment.endPoint.x;
+
+		A.y = gtSegment.startPoint.y;
+		B.y = gtSegment.endPoint.y;
+
+		//Point to calculate its orthogonal distance to the ground truth line
+		C.x = predPoint.x;
+		C.y = predPoint.y;
+
+		// https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
+		double denom =  pcl::euclideanDistance(A, B) + 0.0000001; // To avoid divison by 0
+		double nom = fabs((B.x - A.x) * (A.y - C.y) - (A.x - C.x) * (B.y - A.y));
+
+		return nom / denom;
+	}
+	
+	double Csegmentation::estimateHeadingCost(double side, double hypotenuse){
+		return sqrt(pow(hypotenuse, 2) - pow(side, 2));
+	}
+
+	void Csegmentation::mapMatch(const vector<DashMarking> & gtMarks, const vector<DashMarking> & predMarks, bool SHOW_DISTANCE, pcXYZRGBPtr pcGT){
+
+		
+        vector<vector<double>> costMatrix;
+        vector<vector<DashMarkProps>> propsMatrix;
+		vector<double> minAssignee;
+
+        //Paramters for Map Matching
+        double angle_coeff = 100;
+        double limit_endpoint_dist = 0.5;
+
+		//minimum acceptable cost between a prediction and ground truth to judge whether to include it in the assignment problem or not
+		double MIN_ACCEPT = angle_coeff / 5;
+
+        costMatrix.resize(predMarks.size(), vector<double>(gtMarks.size()));
+        propsMatrix.resize(predMarks.size(), vector<DashMarkProps>(gtMarks.size()));
+		minAssignee.resize(predMarks.size());
+
+		// Estimate the Cost Matrix
+        for(int i = 0; i < predMarks.size(); i++){
+			double MIN_COST = FLT_MAX;
+
+			//TODO: Better implementation to filter out predictions far from everything
+            for(int j = 0; j < gtMarks.size(); j++){
+                
+                DashMarkProps dmp;
+                dmp.startCost = pcl::euclideanDistance(predMarks[i].startPoint, gtMarks[j].startPoint);
+                dmp.endCost = pcl::euclideanDistance(predMarks[i].endPoint, gtMarks[j].endPoint);
+                
+                dmp.angle = angle_coeff * estimateSinAngleVec3D(predMarks[i], gtMarks[j]);
+
+				double orthogonal_to_start = estimateOrthogonalCost(predMarks[i].startPoint, gtMarks[j]);
+				double orthogonal_to_end = estimateOrthogonalCost(predMarks[i].endPoint, gtMarks[j]);
+
+				//Estimating the 2D Hypotenuse is same as in 3D since the assumption is that all points are of the same surface 
+				double hypotenuse_start = dmp.startCost;
+				double hypotenuse_end = dmp.endCost;
+
+				double head_to_start = estimateHeadingCost(orthogonal_to_start,  hypotenuse_start);
+				double head_to_end = estimateHeadingCost(orthogonal_to_end, hypotenuse_end);
+
+				
+				dmp.orthoAvgCost = (orthogonal_to_start + orthogonal_to_end) / 2;
+				dmp.HeadAvgCost = (head_to_start + head_to_end) / 2;
+
+                //cout << "Angle between two markings : " << angle << endl;
+                dmp.cost = dmp.startCost + dmp.endCost +  dmp.angle;
+
+				if(MIN_COST > dmp.cost)
+				{
+					MIN_COST = dmp.cost;
+				}
+
+                costMatrix[i][j] =  dmp.cost;
+                propsMatrix[i][j] = dmp;
+            }
+			minAssignee[i] = MIN_COST;			
+        }
+
+		//Refine cost matrix from false positives
+		int i_tmp = 0;
+		for(int i = 0; i < minAssignee.size(); i++){
+
+			if(minAssignee[i] > MIN_ACCEPT){
+				costMatrix.erase(costMatrix.begin()+i_tmp);
+				propsMatrix.erase(propsMatrix.begin()+i_tmp);
+				i_tmp--;
+			}
+			
+			i_tmp++;
+
+		}
+
+        HungarianAlgorithm HungAlgo;
+        vector<int> assignment;
+
+        
+        double cost = HungAlgo.Solve(costMatrix, assignment);
+		
+		
+		//Make sure there is not conflict later to access the matrices 
+		for(int i = 0; i < minAssignee.size(); i++){
+
+			if(minAssignee[i] > MIN_ACCEPT){
+				assignment.insert(assignment.begin()+i, -2);
+			}
+			
+		}
+
+		//TODO: factor out the visualizations
+        boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Matching Result"));
+        viewer->setBackgroundColor(255, 255, 255);
+
+        double effective_cost = 0;
+
+		int x_tmp = 0;
+		for (unsigned int x = 0; x < assignment.size(); x++){
+
+		if (assignment[x] >= 0){
+
+			//bool start_condition = propsMatrix[x][assignment[x]].startCost < limit_endpoint_dist;
+        	//bool end_condition = propsMatrix[x][assignment[x]].endCost < limit_endpoint_dist;
+
+		//&& start_condition && end_condition){ //To avoid invalid assignment to -1 when number of GTs are less than predictions
+			float r = (rand() / (1.0 + RAND_MAX));
+			float g = (rand() / (1.0 + RAND_MAX)); 
+			float b = (rand() / (1.0 + RAND_MAX));
+
+			viewer->addSphere(predMarks[x].startPoint, 0.2, r, g, b, "Start Point:" + to_string(x));
+			viewer->addSphere(predMarks[x].endPoint, 0.2, r, g, b, "End Point:" + to_string(x));
+
+			viewer->addSphere(gtMarks[assignment[x]].startPoint, 0.2, r, g, b, "Start PointGT:" + to_string(assignment[x]));
+			viewer->addSphere(gtMarks[assignment[x]].endPoint, 0.2, r, g, b, "End PointGT:" + to_string(assignment[x]));
+
+			if(SHOW_DISTANCE){
+				viewer->addArrow(predMarks[x].startPoint, predMarks[x].endPoint, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, "Pred Segment" + to_string(x));
+				viewer->addArrow(gtMarks[assignment[x]].startPoint, gtMarks[assignment[x]].endPoint, 0.5, 1.0, 0.25, 0.5, 1.0, 0.25, "GT Segment" + to_string(assignment[x]));
+			}
+			effective_cost += propsMatrix[x_tmp][assignment[x]].cost;
+			 
+			x_tmp++;
+			}
+			else if(assignment[x] != -2){ //To avoid the case when there are not enough ground truth and assignment is -1 instead
+				x_tmp++;
+			}
+		}
+
+		viewer->addPointCloud(pcGT, "PointCloud Reference");
+        cout << "Click X(close) to continue..." << endl;
+            while (!viewer->wasStopped())
+            {
+                viewer->spinOnce(100);
+                boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+            }
+
+        std::cout << "\nCost is : " << effective_cost << std::endl;
+
+		//Save assignment error for modeling it in Python Notebook
+		outputError(propsMatrix, assignment);
+	}
+
+	void Csegmentation::writeCostFile(const vector<double>& costList, string fileName){
+
+		ofstream fout(fileName);
+
+		if(fout.is_open()){
+			for (unsigned int x = 0; x < costList.size(); x++)
+
+				fout << costList[x] << endl; 
+		}
+		else{
+                cout << "File: " << fileName << " could not be opened." << endl;
+            
+		}
+		fout.close();
+
+	}
+
+	void Csegmentation::outputError(const vector<vector<DashMarkProps>>& propsMatrix, const vector<int>& assignment){
+
+		//Save data for histogram plot
+		string start_cost = "Toronto_start_cost.txt";
+		string end_cost = "Toronto_end_cost.txt";
+		string avg_cost = "Toronto_avg_cost.txt";
+		string angle_cost = "Toronto_angle_cost.txt";
+		string tot_cost = "Toronto_cost.txt";
+		string ortho_cost = "Toronto_ortho_cost.txt";
+		string head_cost = "Toronto_head_cost.txt";
+
+		vector<double> startCosts, endCosts, totCosts, angleCosts, avgCosts, orthoCosts, headCosts;
+
+		int x_tmp = 0;
+        for (unsigned int x = 0; x < assignment.size(); x++)
+        {
+			if (assignment[x] >= 0 ){
+				startCosts.push_back(propsMatrix[x_tmp][assignment[x]].startCost);
+				avgCosts.push_back((propsMatrix[x_tmp][assignment[x]].startCost + propsMatrix[x_tmp][assignment[x]].endCost) / 2);
+				endCosts.push_back(propsMatrix[x_tmp][assignment[x]].endCost);
+				totCosts.push_back(propsMatrix[x_tmp][assignment[x]].cost);
+				angleCosts.push_back(propsMatrix[x_tmp][assignment[x]].angle);
+				orthoCosts.push_back(propsMatrix[x_tmp][assignment[x]].orthoAvgCost);
+				headCosts.push_back(propsMatrix[x_tmp][assignment[x]].HeadAvgCost);
+				x_tmp++;
+			}
+			else if(assignment[x] != -2){ //To avoid the case when there are not enough ground truth and assignment is -1 instead
+				x_tmp++;
+			}
+		}
+
+        writeCostFile(startCosts, start_cost);
+		writeCostFile(endCosts, end_cost);
+		writeCostFile(totCosts, tot_cost);
+		writeCostFile(avgCosts, avg_cost);
+		writeCostFile(angleCosts, angle_cost);
+		writeCostFile(orthoCosts, ortho_cost);
+		writeCostFile(headCosts, head_cost);
+    }
 
 	vector<DashMarking> Csegmentation::EstimateEndPointsGT(pcXYZRGBPtr pcGT, const pcXYZIPtr &cloud, const vector<int> &gtLabels){
 		pcXYZIPtr markingC(new pcXYZI());
@@ -1315,9 +1580,9 @@ namespace roadmarking
 		std::vector<pcl::PointIndices> cluster_indices;
 
 		pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
-		ec.setClusterTolerance (0.3); // 2cm
+		ec.setClusterTolerance (0.2); // 20cm
 		ec.setMinClusterSize (100);
-		ec.setMaxClusterSize (25000);
+		ec.setMaxClusterSize (250000);
 		ec.setSearchMethod (tree);
 		ec.setInputCloud (markingC);
 		ec.extract (cluster_indices);
@@ -1325,7 +1590,7 @@ namespace roadmarking
 		int j = 0;
 		int num_cluster = cluster_indices.end () - cluster_indices.begin(); //Get the total number of clusters 
 		markingsGT.resize(num_cluster);
-		cout << "number of clusters :" << num_cluster << endl;
+		//cout << "number of clusters :" << num_cluster << endl;
 		for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end(); ++it){
 			pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZI>);
 			for (const auto& idx : it->indices)
@@ -1347,7 +1612,7 @@ namespace roadmarking
 		boundaryclouds.resize(clouds.size());
 		int i;
 		//#pragma omp parallel for private(i) //Multi-thread
-		cout << "number of boundry clouds :" << boundaryclouds.size() << endl;
+		//cout << "number of boundry clouds :" << boundaryclouds.size() << endl;
 		for (i = 0; i < clouds.size(); i++)
 		{
 			boundaryclouds[i] = alphashape(clouds[i], resolution*alpha_value_scale); //this is the parameter for alpha-shape, very important
@@ -1362,7 +1627,7 @@ namespace roadmarking
 			tempcloud->points.swap(boundaryclouds[i].points);
 		}
 		// pcXYZRGBPtr boundC(new pcXYZRGB);
-		//visualizeConcaveHullBoundries(pcGT, boundaryclouds);
+		// visualizeConcaveHullBoundries(pcGT, boundaryclouds);
 		//cout << "Boundary Extraction Done" << endl;
 	}
 
@@ -1385,6 +1650,7 @@ namespace roadmarking
 			}
 			tempcloud->points.swap(boundaryclouds[i].points);
 		}
+		//visualizeConcaveHullBoundries(pcXYZRGBPtr(new pcXYZRGB()), boundaryclouds);
 	}
 
 	void Csegmentation::visualizeConcaveHullBoundries(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds){

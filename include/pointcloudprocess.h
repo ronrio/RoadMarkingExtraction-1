@@ -11,6 +11,8 @@
 #include <pcl/common/pca.h>
 #include <pcl/segmentation/extract_clusters.h>
 
+#include <iostream>  // To save the data
+
 using namespace std;
 
 namespace roadmarking
@@ -80,6 +82,7 @@ namespace roadmarking
 		void getClassificationResult(pcXYZRGBPtr pcGT, const vector<pcXYZI> &outclouds);
 		vector<DashMarking> EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds);
 		vector<DashMarking> EstimateEndPointsGT(pcXYZRGBPtr pcGT, const pcXYZIPtr &cloud, const vector<int> &gtLabels);
+		void mapMatch(const vector<DashMarking> & gtMarks, const vector<DashMarking> & predMarks, bool SHOW_DISTANCE, pcXYZRGBPtr pcGT);
 
 		
 	protected:
@@ -87,6 +90,11 @@ namespace roadmarking
 	
 	private:
 		float resolution;
+		double estimateSinAngleVec3D(const DashMarking& predInst, const DashMarking& GtInst);
+		void outputError(const vector<vector<DashMarkProps>>& propsMatrix, const vector<int>& assignment);
+		void writeCostFile(const vector<double>& costList, string fileName);
+		double estimateOrthogonalCost(const pcl::PointXYZI& predPoint, const DashMarking& gtSegment);
+		double estimateHeadingCost(double side, double hypotenuse);
 		
 		
 	};

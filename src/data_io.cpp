@@ -93,6 +93,12 @@ namespace roadmarking
 		infile >> paralist.HC.decimal_tol;
 		infile >> paralist.HC.vote_thres;
 		infile >> paralist.HC.marking_width;
+
+		//Sparse Param
+		infile >> paralist.IS_SPARSE;
+		
+		//Visualization Param
+		infile >> paralist.SHOW_DISTANCE;
 	}
 
 	void DataIo::displayparameter(int datatype, int roadtype, int is_road_extracted)
@@ -436,9 +442,6 @@ namespace roadmarking
 		// extract.filter(*pointCloud);
     
 		
-		std::cout << "Loaded Points After filtering: "
-                << pointCloud->points.size()
-                << std::endl;
 		if (pointCloud->points[0].intensity==0) //check if the intensity exist
 			printf("Warning! Point cloud intensity may not be imported properly, check the scalar field's name.\n");
 		getCloudBound(pointCloud, bound_3d);
@@ -457,6 +460,22 @@ namespace roadmarking
 			if(this->groundTruth.groundTruthVals[i] == 1)
 				pcGT->points[i].g = 255;
 		}
+
+		/*//Step 2. Voxel Down-sampling (Optional)
+		float voxelSize = 0.03f;
+		// Create the filtering object
+		pcl::VoxelGrid<pcl::PointXYZI> sor;
+		sor.setInputCloud(pointCloud);
+		sor.setLeafSize (voxelSize, voxelSize, voxelSize);
+		sor.filter(*pointCloud);
+		std::cout << "Loaded Points After filtering: "
+					<< pointCloud->points.size()
+					<< std::endl;
+
+		pcl::VoxelGrid<pcl::PointXYZRGB> sor_gt;
+		sor_gt.setInputCloud(pcGT);
+		sor_gt.setLeafSize (voxelSize, voxelSize, voxelSize);
+		sor_gt.filter(*pcGT);*/
 
 		return true;
 	}
@@ -485,14 +504,14 @@ namespace roadmarking
 			if(pointCloud->points[i].intensity > intensityMax)
 				intensityMax = pointCloud->points[i].intensity;
 
-			/*float iAvg = 0.5;
+			float iAvg = 0.5;
 			//TODO: Differentiate in the configuration between Scans with scale of 1 and scale of 255 !!
 			if (pointCloud->points[i].intensity >= iAvg && pointCloud->points[i].intensity < 1.0)  // e.g. remove all pts below iAvg
 			{
 				pointCloud->points[i].intensity *= 100;
 				// Manual filtering point cloud
 				// inliers->indices.push_back(i);
-			}*/
+			}
 		}
 		// Manual filtering point cloud
 		// extract.setInputCloud(pointCloud);
@@ -980,7 +999,7 @@ namespace roadmarking
 			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
 		}
 	}
-	void DataIo::displayGroundwithIntensities(const pcXYZIPtr &gcloud, const float &intensity_limit, const float &elevation_limit)
+	void DataIo::displayGroundwithIntensities(const pcXYZIPtr &gcloud, const vector<DashMarking> &marks)
 	{
 		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Ground Point Cloud With Intensities"));
 		pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointXYZI> point_cloud_color_handler(gcloud, "intensity");
@@ -996,40 +1015,18 @@ namespace roadmarking
 		max_z = -FLT_MAX;
 		min_z = FLT_MAX;
 
-		pcXYZIPtr GC(new pcXYZI());
-
-		for (size_t i = 0; i < gcloud->points.size(); ++i)
-		{
-			if (gcloud->points[i].intensity > maxi)
-				maxi = gcloud->points[i].intensity;
-			if (gcloud->points[i].intensity < mini)
-				mini = gcloud->points[i].intensity;
-		}
-
-		// Ground points are rendered in intensity
-		for (size_t i = 0; i < gcloud->points.size(); ++i)
-		{
-			// filter points with relatively high threshold (0.4) with elevation below 0
-			// if(gcloud->points[i].intensity >= intensity_limit && gcloud->points[i].z <= elevation_limit){
-				GC->points.push_back(gcloud->points[i]);
-				// Show .PCD information
-				// std::cout << "    " << gcloud->points[i].x
-				// << " "    << gcloud->points[i].y
-				// << " "    << gcloud->points[i].z
-				// << " "    << gcloud->points[i].intensity
-				// << std::endl;
-			// }
-			
-		}
-
 		std::cout << "Loaded "
             << " "
-			<< GC->points.size()
+			<< gcloud->points.size()
             << std::endl;
 
-		viewer->addPointCloud< pcl::PointXYZI >(GC, point_cloud_color_handler, "Ground");
+		for(int i = 0; i < marks.size(); i++){
+		viewer->addSphere(marks[i].startPoint, 0.2, 1.0, 1.0, 1.0, "Start Point:" + to_string(i));
+    	viewer->addSphere(marks[i].endPoint, 0.2, 1.0, 1.0, 1.0, "End Point:" + to_string(i));
+	}
+
+		viewer->addPointCloud< pcl::PointXYZI >(gcloud, point_cloud_color_handler, "Ground");
 		viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "Ground");
-		// viewer->addPointCloud(GC, "Ground");
 
 		cout << "Click X(close) to continue..." << endl;
 		while (!viewer->wasStopped())

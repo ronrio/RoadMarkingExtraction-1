@@ -5,6 +5,7 @@ sample_data
 0015_sync_pcd/*
 build
 bin/roadmarking
+*.txt
 
 # Prerequisites
 *.d

@@ -4,8 +4,8 @@
 #include "pointcloudprocess.h"
 #include "imageprocess.h"
 #include "modelmatch.h"
+#include <pcl/filters/voxel_grid.h>
 #include <chrono>
-
 
 using namespace std;
 using namespace roadmarking;
@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     std::string outputFolderPath = argv[3];
     std::string model_path = "./model_pool/models_urban_example/";
     std::string parm_file = "./config/parameter_urban_example.txt";
-    bool IS_SPARSE = false;
+    
 
     if (argc == 4)
         printf("Model pool path and configuration file are not specified, use the default model pool and parameters.\n");
@@ -74,11 +74,15 @@ int main(int argc, char *argv[])
     is_road_extracted = 0; //not extracted
 
     io.readParalist(parm_file);
-    if(!IS_SPARSE)
-        io.readGroundTruth(gt_file);
 
     roadtype = io.paralist.road_type;
     float density = io.paralist.expected_point_num_per_m_square;
+    bool IS_SPARSE = io.paralist.IS_SPARSE;
+    bool SHOW_DISTANCE = io.paralist.SHOW_DISTANCE;
+
+    if(!IS_SPARSE)
+        io.readGroundTruth(gt_file);
+
     resolution = io.paralist.grid_resolution;
     if (io.paralist.visualization_on)
         cout << "Visualization on" << endl;
@@ -98,7 +102,7 @@ int main(int argc, char *argv[])
     vector<double> CloudBoundingBox; // Xmin,Ymin,Zmin,Xmax,Ymax,Zmax after translation for Input point cloud;
     Bounds bound_3d_temp;
     double X_origin =0.0, Y_origin=0.0; // X,Y origin before translation;
-    pcXYZRGBPtr pcGT(new pcXYZRGB());
+    pcXYZRGBPtr pcGT(new pcXYZRGB()), pcPred(new pcXYZRGB());
     
     //Step 2,3
     pcXYZIPtr fcloud(new pcXYZI());  // Sampled point cloud
@@ -154,6 +158,8 @@ int main(int argc, char *argv[])
                         << filename
                         << std::endl;
                 gtMarks = seg.EstimateEndPointsGT(pcGT, cloud, io.groundTruth.groundTruthVals);
+                cout << "====================================================================" << endl;
+                cout << "Number of Ground Truth Dashed Marking Segments are : " << gtMarks.size() << endl;
             }
             else
                 io.readPcdFile(inputFilePath, cloud, bound_3d_temp);
@@ -168,13 +174,7 @@ int main(int argc, char *argv[])
 
     std::chrono::steady_clock::time_point tic = std::chrono::steady_clock::now();
 
-    //Step 2. Voxel Down-sampling (Optional)
-    /*float voxelSize = 0.02;
-		VoxelFilter vfilter(voxelSize);
-		fcloud= vfilter.filter(cloud);
-		//cout << "the number of filtered point clouds in file " << i << " : " << fcloud->size() << endl;
-		}*/
-
+    
     //Step 3. Ground Filter and projection (Optional)
     // The Ground Segmentation can help you find the road more precisely. However, this process would take more time.
     // Method 1: Dual-threshold grid based filter (Fast)
@@ -195,21 +195,21 @@ int main(int argc, char *argv[])
     //Csegmentation seg(resolution);
     //Preprocessing: Segmentation and Fitting (Optional)
     //RANSAC plane segmentation
-    /*pcXYZIPtr fitcloud(new pcXYZI());
-	  float td = 1;
-	  fitcloud = seg.planesegRansac(gcloud, td);
-	  io.writePcdFile("ransac ground cloud.pcd", fitcloud);
-	  //Projection
-	  pcXYZIPtr pgcloud(new pcXYZI());
-      pgcloud = seg.groundprojection(gcloud);
-	  io.writePcdFile("projected groundcloud.pcd", pgcloud);*/
+    //pcXYZIPtr fitcloud(new pcXYZI());
+	//float td = 0.2;
+	//gcloud = seg.planesegRansac(gcloud, td);
+	//io.writePcdFile("ransac ground cloud.pcd", fitcloud);
+	//Projection
+	//pcXYZIPtr pgcloud(new pcXYZI());
+    //pgcloud = seg.groundprojection(gcloud);
+	  //io.writePcdFile("projected groundcloud.pcd", pgcloud);
+    //io.displayGroundwithIntensities(fitcloud, 0.3, 0);
 
     //Step 4. 3D->2D projection, Generating Projection Image
     Imageprocess ip;
     // Extract the ground truth endpoints
     if(!IS_SPARSE){
-        ip.savepcgrid(bound_3d_temp, resolution, cloud, gcloud, ngcloud, pcGT); //get image size and save point indices in each pixel
-        cout << "Number of dash markings in the dataset are " << gtMarks.size() << endl;
+        ip.savepcgrid(bound_3d_temp, resolution, cloud, gcloud, ngcloud, pcGT); //Get image size and save point indices in each pixel
     }
     else
         ip.savepcgrid(bound_3d_temp, resolution, cloud, gcloud, ngcloud);
@@ -220,12 +220,14 @@ int main(int argc, char *argv[])
     // ip.applyPrespectiveTransform(imgI, bound_3d_temp);
 
     //5.3.2. Morphological Operations: Dilation and Closing (Optional)
-    // Mat imgI_tmp, imgI_morph;
-    Mat dilate_element = getStructuringElement(MORPH_RECT, Size(3, 11));
-    Mat open_element = getStructuringElement(MORPH_RECT, Size(5, 5));
-    // dilate(imgI, imgI_morph, dilate_element);
-    // imwrite("after_morph_dilate.png", imgI_morph);
-    // morphologyEx(imgI_morph, imgI_morph, MORPH_OPEN, open_element);
+    if(IS_SPARSE){
+        Mat imgI_tmp, imgI_morph;
+        Mat dilate_element = getStructuringElement(MORPH_RECT, Size(3, 3));
+        Mat open_element = getStructuringElement(MORPH_CROSS, Size(3, 3));
+        dilate(imgI, imgI_morph, dilate_element);
+        imwrite("after_morph_dilate.png", imgI_morph);
+        imgI = imgI_morph;
+    }
 		// dilate(imgIbfilter, dilateImg, Mat(),element);
 		//erode(dilateImg, closeImg, Mat());  // ->closeImg
     // resize(imgI, imgI_tmp, Size(), 0.25, 0.25, INTER_LINEAR);
@@ -253,6 +255,8 @@ int main(int argc, char *argv[])
         medianBlur(imgI, imgImf, 3); // Remove the salt and pepper noise
     else if (datatype == 2)
         imgImf = imgI; // For ALS
+    
+
 
     //5.1.2 Sobel gradient calculation and boundary extraction
     // Image 5
@@ -270,7 +274,10 @@ int main(int argc, char *argv[])
         // Image 8
         imgDbinary = ip.maxEntropySegMentation(imgD); // for MLS
         // Image 9
-        imgIgradientroad = ip.ExtractRoadPixelIZD(imgIgradient, imgZbinary, imgDbinary); //Use the slope and point density as the criterion
+        if(!IS_SPARSE)
+            imgIgradientroad = ip.ExtractRoadPixelIZD(imgIgradient, imgZbinary, imgDbinary); //Use the slope and point density as the criterion
+        else
+            imgIgradientroad = ip.ExtractRoadPixelIZD(imgImf, imgZbinary, imgDbinary); //Use the slope and point density as the criterion
         // dilate_element = getStructuringElement(MORPH_RECT, Size(3, 3));
         // open_element = getStructuringElement(MORPH_RECT, Size(3, 3));
         // dilate(imgIgradientroad, imgIgradientroad, dilate_element);
@@ -310,7 +317,7 @@ int main(int argc, char *argv[])
     Timg = imgIbfilter;
     // Timg = imgIbinary;
     //ip.Truncate(imgIbfilter, Timg); //may encounter some problem (OpenCV Error: Assertion failed)
-    ip.ImgFilling(Timg, imgFilled, io.paralist.HC); //Filling the holes inside the markings (Optional)
+    ip.ImgFilling(imgIbfilter, imgFilled, io.paralist.HC, IS_SPARSE); //Filling the holes inside the markings (Optional)
     // ip.labelMarkingsPC(imgFilled); //Classify marking points
     // Image 11
     //ip.CcaBySeedFill(Timg, labelImg);
@@ -335,13 +342,16 @@ int main(int argc, char *argv[])
     for(size_t i = 0; i < outclouds.size(); i++){
         cout << "Number of points in cluster " << i << " are " << outclouds[i].size() << endl;
     }*/
-    
+
     //Use Otsu (Intensity) Method and Statistics Outlier Remover to filter the point cloud
+    // Add number of neighbourhood as parameter as the program crashes if there are clusters below that number
     seg.cloudFilter(outclouds, outcloud_otsu_sor, 256, 10, 2.5); // Three parameters: the first is for the histogram level of Otsu Thresholding , the second is for SOR neighbor number and the third is for SOR std threshold
 
     // Evaluate the marking using the intensity threshold of the Otsu method
     if(!IS_SPARSE)
         ip.EvaluateLaneMarkings(imgFilled, pcGT);
+    else
+        ip.generatePredictionPC(imgFilled, gcloud, pcPred);
 
     //Delete point clouds whose point number is less than a threshold
     if (datatype == 1)
@@ -359,55 +369,20 @@ int main(int argc, char *argv[])
     // Boundary Extraction: Alpha-Shape Concave Hull Generation
     if(!IS_SPARSE){
         seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, pcGT, 1, 0.5);
+
         predMarks = seg.EstimateEndPoints(pcGT, boundaryclouds);
-        cout << "Number of dash markings predicted are " << predMarks.size() << endl;
+        cout << "====================================================================" << endl;
+        cout << "Number of Predicted Dashed Marking Segments are : " << predMarks.size() << endl;
 
-        // Estimate the Cost Matrix
-        vector<vector<double>> costMatrix;
-        costMatrix.resize(predMarks.size(), vector<double>(gtMarks.size()));
-        for(int i = 0; i < predMarks.size(); i++){
-            for(int j = 0; j < gtMarks.size(); j++){
-                //TODO:What would be a cost function ? False positive affect the assignment process so bad 
-                costMatrix[i][j] = pcl::squaredEuclideanDistance(predMarks[i].startPoint, gtMarks[j].startPoint) + pcl::squaredEuclideanDistance(predMarks[i].endPoint, gtMarks[j].endPoint);
-            }
-        }
+        // Apply Map Matching
+        seg.mapMatch(gtMarks, predMarks, SHOW_DISTANCE, pcGT);
 
-        HungarianAlgorithm HungAlgo;
-        vector<int> assignment;
-
-        double cost = HungAlgo.Solve(costMatrix, assignment);
-
-        boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Matching Result"));
-        viewer->setBackgroundColor(255, 255, 255);
-
-        for (unsigned int x = 0; x < costMatrix.size(); x++)
-        {
-            float r = (rand() / (1.0 + RAND_MAX));
-            float g = (rand() / (1.0 + RAND_MAX)); 
-            float b = (rand() / (1.0 + RAND_MAX));
-
-            viewer->addSphere(predMarks[x].startPoint, 0.2, r, g, b, "Start Point:" + to_string(x));
-            viewer->addSphere(predMarks[x].endPoint, 0.2, r, g, b, "End Point:" + to_string(x));
-
-            viewer->addSphere(gtMarks[assignment[x]].startPoint, 0.2, r, g, b, "Start PointGT:" + to_string(assignment[x]));
-            viewer->addSphere(gtMarks[assignment[x]].endPoint, 0.2, r, g, b, "End PointGT:" + to_string(assignment[x]));
-
-            viewer->addLine(predMarks[x].startPoint, predMarks[x].endPoint, 1.0, 0.0, 0.0, "Pred Segment" + to_string(x));
-            viewer->addLine(gtMarks[assignment[x]].startPoint, gtMarks[assignment[x]].endPoint, 0.5, 1.0, 0.25, "GT Segment" + to_string(assignment[x]));
-        }
-
-        viewer->addPointCloud(pcGT, "PointCloud Reference");
-        cout << "Click X(close) to continue..." << endl;
-            while (!viewer->wasStopped())
-            {
-                viewer->spinOnce(100);
-                boost::this_thread::sleep(boost::posix_time::microseconds(100000));
-            }
-
-        std::cout << "\ncost: " << cost << std::endl;
     }
     else
-        seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, 1, 0.5);
+        {
+            seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, 1, 0.5);
+            predMarks = seg.EstimateEndPoints(pcPred, boundaryclouds);
+        }
 
 
     // Corner Extraction: Neighborhood Processing
@@ -487,7 +462,7 @@ int main(int argc, char *argv[])
         // io.displaymarkwithng(outcloud_otsu_sor_n, ngcloud);          //Display road markings point clouds with non-ground cloud
         // io.displaymarkbycategory(outcloud_otsu_sor_n, roadmarkings); //Display road markings point clouds rendered by category
         //io.displaymarkVect(roadmarkings, sideline_roadmarkings);                        //Display vectorized road markings
-        io.displayGroundwithIntensities(gcloud, 0.3, 0);                        // Display Ground Point Cloud with their respective intensities    
+        io.displayGroundwithIntensities(gcloud, predMarks);                        // Display Ground Point Cloud with their respective intensities    
 
     }
     

@@ -1,7 +1,7 @@
 2
-900.0
+1000.0
 0.05
-8.0
+7.0
 2.5
 20
 0.05
@@ -15,8 +15,10 @@
 1
 1
 4
-100
+60
 3
+0
+1
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 Parameters Notification
@@ -39,4 +41,6 @@ Parameters Notification
 17 decimal_tol (controls the number of decimals to tolerate angle difference among a group of parallel lines): default: 1
 18 vote_thres (number of votes needed by the Hough algorithm to detect a line, the higher, the more robust is the detection with less lines) default: 100
 19 marking_width (controls the width of a detected marking, in pixels. Relative to the grid resolution,the marking width can be tuned) default 3
+20 IS_SPARSE (A flag indicating if the scan used for processing is dense or sparse) default 0
+21 SHOW_DISTANCE (A flag indicating if the distances of the marking segments to be shown or not) default 1
 --------------------------------------------------------------------------------------------------------------------------------------------

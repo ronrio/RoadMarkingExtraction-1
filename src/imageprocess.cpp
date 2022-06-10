@@ -327,6 +327,9 @@ namespace roadmarking
 		// cv::imshow("Intensity image after scaling", img);
 		visualizeIntensityHistogram(img);
 		// cv::waitKey();
+		//TODO: Applying Limited Contrast Adaptive Histogram Equalization
+
+
 	}
 
 	void Imageprocess::pc2imgZ(const pcXYZIPtr &cloud, int whatcloud, cv::Mat &img)
@@ -553,10 +556,18 @@ namespace roadmarking
 
 		for (int k = 0; k <= totallabel - 2; k++)
 		{
-			if (outclouds[k].size() > 0)
-				classNo++;
+			if (outclouds[k].size() > 10){ //This is important for the statistical filter algorithm to work
+					classNo++;
+				//cout << "Number of points per cluster: " << outclouds[k].size() << endl;
+			}
+			else{
+				outclouds.erase(outclouds.begin()+k);
+				k--;
+				totallabel--;
+			}
+
 		}
-		//cout << "Cloud Number: " << classNo << endl;
+		cout << "Number of Cloud : " << classNo << endl;
 		cout << "Number of rejected points :  " << count_points << endl;
 		cout << "Number of rejected pixels :  " << count_pixels << endl;
 	}
@@ -1207,7 +1218,7 @@ namespace roadmarking
 		// intensityLineSegmentDetector(255 * img_fill);
 	}
 
-	void Imageprocess::ImgFilling(const cv::Mat &img, cv::Mat &img_fill, HoughConfig HC)
+	void Imageprocess::ImgFilling(const cv::Mat &img, cv::Mat &img_fill, HoughConfig HC, bool IS_SPARSE)
 	{
 		img.convertTo(img_fill, CV_8UC1);
 
@@ -1226,16 +1237,49 @@ namespace roadmarking
 			}
 		}
 
-		/*vector<cv::Vec2f> houghLines = intensityHoughLineDetector(255 * img_fill,HC);
+		
 
 		// Transform the image into a horizontal Orientation
-		cv::Vec2f trajectory_line = houghLines[0];
-		int off_y = 10, off_x = 5;
-		cv::Mat img_h;
-		cout << "Vehicle trajectory cv::line : " << trajectory_line << endl;
+		/*double minVal; 
+		double maxVal; 
+		cv::Point minLoc; 
+		cv::Point maxLoc;
 
-		img_h = rotateFrame(255 * img_fill, houghLines);
-		vector<vector<cv::Point>> polyList_idx = getNonZeroIdx(houghLines, img_h, off_y, off_x);*/
+		minMaxLoc(img_fill, &minVal, &maxVal, &minLoc, &maxLoc );
+		cout << "The maximum value of fill_img: " << maxVal << endl;
+		cout << "The minimum value of fill_img: " << minVal << endl;*/
+
+		if(IS_SPARSE){
+			vector<cv::Vec2f> houghLines = intensityHoughLineDetector(255 * img_fill,HC);
+			cv::Vec2f trajectory_line = houghLines[0];
+			//TODO: This should consider the resolution of the grid instead of an arbitrary values
+			int off_y = 30, off_x = 5;
+			cv::Mat img_h;
+			cout << "Vehicle trajectory line : " << trajectory_line << endl;
+			cout << "Image size before Hough" << img_fill.size() << endl;
+			cv::imshow("Image size before Hough", 255 * img_fill);
+			img_h = rotateFrame(255 * img_fill, houghLines);
+			cv::imshow("Image size before Hough", 255 * img_h);
+			cv::Mat LaneMat = getNonZeroIdx(houghLines, img_h, off_y, off_x);
+			double theta = trajectory_line[1];
+			double recovery_angle = (CV_PI / 2.0 - theta)  * (180 / CV_PI); 
+			cv::Size orig_img_size = img_fill.size();
+			cv::Mat recoveredImg = recoverImg(LaneMat, orig_img_size, recovery_angle);
+
+			img_fill = recoveredImg / 255;
+			cout << "Image size After Hough " << img_fill.size() << endl;
+		}
+		// Make sure it has the same dimension as before Hough Transfrom
+		//resize(imgHough, imgHough, cv::Size(orig_img_size.width, orig_img_size.height), cv::INTER_LINEAR);
+
+		/*minMaxLoc(imgHough, &minVal, &maxVal, &minLoc, &maxLoc );
+		cout << "The maximum value of imgHough: " << maxVal << endl;
+		cout << "The minimum value of imgHough: " << minVal << endl;
+		
+
+		cv::bitwise_and(imgHough, img_fill, imgHough);
+		cv::imshow("Hough Mask", 255 * imgHough);
+		cv::waitKey();*/
 	}
 
 	void Imageprocess::DetectCornerShiTomasi(const cv::Mat &src, const cv::Mat &colorlabel, cv::Mat &cornerwithimg, int minDistance, double qualityLevel)
@@ -1663,12 +1707,12 @@ namespace roadmarking
 	vector<cv::Point> Imageprocess::returnHoughLineBound(const cv::Size& imgBounds, const cv::Vec2f &line, int window_width){
 		vector<cv::Point> lineBound;
 		int WIDTH = imgBounds.width, HEIGHT = imgBounds.height;
-		cout << "WIDTH X HEIGHT : " << WIDTH << "  " << HEIGHT << endl;
+		//cout << "WIDTH X HEIGHT : " << WIDTH << "  " << HEIGHT << endl;
 		float rho = line[0], theta = line[1];
 		// TODO: What should happen if the angle is 0: 1/sin(0) == inf
 		if (theta == 0)
 			theta = 0.0001;
-		cout << "RHO Value: " << rho << "   " << "THETA value: " << theta  << endl;
+		//cout << "RHO Value: " << rho << "   " << "THETA value: " << theta  << endl;
 		float x, y, a, b; // for testing boundry cv::Point
 		cv::Point boundPoint;
 
@@ -1680,7 +1724,7 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[y = 0] A found boundry cv::Point : " << boundPoint << endl;
+			//cout << "[y = 0] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		y = WIDTH;
@@ -1690,47 +1734,48 @@ namespace roadmarking
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[y = WIDTH] A found boundry cv::Point : " << boundPoint << endl;
+			//cout << "[y = WIDTH] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		//Check for x limits
 		x = 0;
 		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
-		cout << "A: " << a << endl;
+		//cout << "A: " << a << endl;
 		y = (x - b) * pow(a, -1);
 		if (y >= 0 && y <= WIDTH){
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[x = 0;] A found boundry cv::Point : " << boundPoint << endl;
+			//cout << "[x = 0;] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
 		x = HEIGHT;
 		b = rho / sin(theta), a = -1 * (cos(theta) / sin(theta));
-		cout << "A: " << a << endl;
+		//cout << "A: " << a << endl;
 		y = (x - b) * pow(a, -1);
 		if (y >= 0 && y <= WIDTH){
 			boundPoint.y = cvRound(x);
 			boundPoint.x = cvRound(y);
 			lineBound.push_back(boundPoint);
-			cout << "[x = HEIGHT;] A found boundry cv::Point : " << boundPoint << endl;
+			//cout << "[x = HEIGHT;] A found boundry cv::Point : " << boundPoint << endl;
 		}
 
-		cout << "=======================================" << endl;
+		/*cout << "=======================================" << endl;
 		cout << "cv::line bound cv::Point # :"; 
 		for(size_t i = 0; i < lineBound.size(); i++){
 			cout << " " << lineBound[i];
 		}
-		cout << endl << "=======================================" << endl;
+		cout << endl << "=======================================" << endl;*/
 
 
 		//TODO: Handle the case for the offset outside the image boundry
 		return lineBound;
 	}
 
-	cv::Mat Imageprocess::rotateFrame(cv::Mat img, vector<cv::Vec2f> & houghLines){
+	cv::Mat Imageprocess::rotateFrame(const cv::Mat &img, vector<cv::Vec2f> & houghLines){
 		// TODO: Should be a user defined input instead !!
 		cv::Mat disp_img = img.clone();
+		cout << "The size of the image before rotation " << img.size() << endl;
 		for(size_t line_i = 0; line_i < houghLines.size(); line_i++){
 			vector<cv::Point> lineImgBounds = returnHoughLineBound(disp_img.size(), houghLines[line_i], 5);
 			cv::Point line_start = lineImgBounds[0], line_end = lineImgBounds[1];
@@ -1740,50 +1785,95 @@ namespace roadmarking
 
 		double theta = houghLines[0][1];
 		double rot_angle_in_degrees = (theta - CV_PI / 2.0)  * (180 / CV_PI);
-		cout << " Trajectory Angle: " << (theta *(180 / CV_PI)) << endl;
-		cout << " Rotation Angle : " << rot_angle_in_degrees << endl;
+		//cout << " Trajectory Angle: " << (theta *(180 / CV_PI)) << endl;
+		//cout << " Rotation Angle : " << rot_angle_in_degrees << endl;
 		
-		// get rotation matrix for rotating the image around its center in pixel coordinates
+		// Get rotation matrix for rotating the image around its center in pixel coordinates
 		cv::Point2f center((img.cols-1)/2.0, (img.rows-1)/2.0);
 		cv::Mat rot = cv::getRotationMatrix2D(center, rot_angle_in_degrees, 1.0);
-		// determine bounding rectangle, center not relevant
+		// Determine bounding rectangle, center not relevant
 		cv::Rect2f bbox = cv::RotatedRect(cv::Point2f(), img.size(), rot_angle_in_degrees).boundingRect2f();
 		
-		// adjust transformation matrix
+		// Adjust transformation matrix
 		rot.at<double>(0,2) += bbox.width/2.0 - img.cols/2.0;
 		rot.at<double>(1,2) += bbox.height/2.0 - img.rows/2.0;
 
-		// Visualize lines before rotation and after
+		/*// Visualize lines before rotation and after
 		for(size_t i = 0; i < houghLines.size(); i++){
-			cout << "Before rotation cv::line coordinates: " << houghLines[i] << endl;
-		}
-		// Adjust the Hough Lines
+			cout << "Before rotation line coordinates: " << houghLines[i] << endl;
+		}*/
+
+		// Adjust Hough Lines
 		double shifted_rho = sqrt(pow(rot.at<double>(0,2), 2) + pow(rot.at<double>(1,2), 2));
 		for(size_t i = 0; i < houghLines.size(); i++){
 			if( houghLines[i][0] < 0)
 				houghLines[i][0] += shifted_rho;
 			houghLines[i][1] =  CV_PI / 2.0;
-			cout << "After rotation cv::line coordinates: " << houghLines[i] << endl;
+			//cout << "After rotation cv::line coordinates: " << houghLines[i] << endl;
 		}
 
 		cv::Mat dst;
 		img.copyTo(dst);
 		cv::warpAffine(img, dst, rot, bbox.size());
-		// for(size_t line_i = 0; line_i < houghLines.size(); line_i++){
-		// 	vector<cv::Point> lineImgBounds = returnHoughLineBound(dst.size(), houghLines[line_i], 5);
-		// 	cv::Point line_start = lineImgBounds[0], line_end = lineImgBounds[1];
-		// 	cv::line(dst, line_start, line_end, cv::Scalar(255), 2);
-		// }
-		// cv::imshow("Lines After rotation", dst);
-		// cv::waitKey();
-		// cv::imwrite("rotated_img.png", dst);
+		/*for(size_t line_i = 0; line_i < houghLines.size(); line_i++){
+		 	vector<cv::Point> lineImgBounds = returnHoughLineBound(dst.size(), houghLines[line_i], 5);
+		 	cv::Point line_start = lineImgBounds[0], line_end = lineImgBounds[1];
+		 	cv::line(dst, line_start, line_end, cv::Scalar(255), 2);
+		 }
+		cv::imshow("Lines After rotation", dst);
+		cv::waitKey();*/
+
 		return dst;
-		//TODO: Revert it back to the original orientation
+		
 	}
 
-	vector<vector<cv::Point>> Imageprocess::getNonZeroIdx(vector<cv::Vec2f> houghLines, cv::Mat img_h, int off_y, int off_x){
+	cv::Mat Imageprocess::recoverImg(const cv::Mat &img, const cv::Size &orig_dims, const double &rot_angle_in_degrees){
+		
+		cv::Mat recovered_img;
+		cv::Point2f center((img.cols-1)/2.0, (img.rows-1)/2.0);
+		// Determine bounding rectangle, center not relevant
+		cv::Rect2f bbox = cv::RotatedRect(cv::Point2f(), img.size(), rot_angle_in_degrees).boundingRect2f();
+		
+		
+		cout << "The size of the rotated image " << img.size() << endl;
+		cv::Mat rot = cv::getRotationMatrix2D(center, rot_angle_in_degrees, 1.0);
+
+		// Adjust transformation matrix
+		rot.at<double>(0,2) += bbox.width/2.0 - img.cols/2.0;
+		rot.at<double>(1,2) += bbox.height/2.0 - img.rows/2.0;
+
+		cv::warpAffine(img, recovered_img, rot, bbox.size());
+		//The new center of the image
+		center = cv::Point2f((recovered_img.cols-1)/2.0, (recovered_img.rows-1)/2.0);
+		
+		cout << "The size of the recovered image " << recovered_img.size() << endl;
+
+		cv::Range range_x, range_y;
+		cout << " Center point is : " << center << endl; 
+		cout << " Original Dims are : " << orig_dims << endl; 
+		// Make sure it has the same dimensions as the original frame of reference
+		range_x.start = cvRound(center.x - (orig_dims.width) / 2.0); range_x.end = cvRound(range_x.start + orig_dims.width);
+		range_y.start = cvRound(center.y - (orig_dims.height) / 2.0); range_y.end = cvRound(range_y.start + orig_dims.height);
+
+		cout << " Range_x is : " << range_x.start << " , "  << range_x.end << endl;
+		cout << " Range_y is : " << range_y.start << " , "  << range_y.end << endl;
+
+		//Compensate for pixel dim rounding
+		//range_x.end += orig_dims.width - range_x.end;
+		//range_y.end += orig_dims.height - range_y.end;
+
+		cv::imshow("Image recovery", recovered_img(range_y, range_x));
+		//cv::waitKey();
+
+		return recovered_img(range_y, range_x);
+	}
+
+	//TODO:: Disregard storing indices as it just for polynomial detection
+	cv::Mat Imageprocess::getNonZeroIdx(vector<cv::Vec2f> houghLines, cv::Mat img_h, int off_y, int off_x){
 		
 		vector<vector<cv::Point>> idxList; 
+		
+		cv::Mat laneMat = cv::Mat::zeros(img_h.size(), CV_8UC1);
 
 		// Initialize the vector of cv::line indices
 		idxList.resize(houghLines.size());
@@ -1840,21 +1930,23 @@ namespace roadmarking
 				// cv::waitKey();
 				// cout << "============================================="<< endl;
 				vector<cv::Point> nonzero_region;
-				findNonZero(roi, nonzero_region);
+				cv::findNonZero(roi, nonzero_region);
 				// cout << "===============BEFORE ACCUMM: NON ZERO cv::Point===============" << endl;
 				// for (size_t idx = 0; idx < nonzero_region.size(); idx++)
 				// 	cout << nonzero_region[idx] << endl;
 				// cout << "============================================="<< endl;
-				// cout << "===============AFTER ACCUMM: NON ZERO cv::Point===============" << endl;
-				// for (size_t idx = 0; idx < nonzero_region.size(); idx++){
-				// 	nonzero_region[idx].x += win_start_y;
-				// 	nonzero_region[idx].y += win_start_x;
+				cout << "===============AFTER ACCUMM: NON ZERO cv::Point===============" << endl;
+				for (int idx = 0; idx < nonzero_region.size(); idx++){
+					nonzero_region[idx].x += win_start_y;
+					nonzero_region[idx].y += win_start_x;
+					int i = nonzero_region[idx].y, j = nonzero_region[idx].x;
+					laneMat.at<uchar>(i, j) = 255;
 				// 	cout << nonzero_region[idx] << endl;
-				// }
+				}
 				// cout << "============================================="<< endl;
 				// idxList[line_i].insert(idxList[line_i].end(), nonzero_region.begin(), nonzero_region.end());
 				
-				// find cv::Moments of the image
+				// find Moments of the image
 				cv::Moments m = cv::moments(roi,true);
 				cv::Point p(m.m10/m.m00, m.m01/m.m00);
 
@@ -1876,10 +1968,10 @@ namespace roadmarking
 					mass_center.y = win_start_x + off_x;
 					cv::circle(disp_src, mass_center, 2, cv::Scalar(100, 255, 0), 2);
 					rectangle(disp_src, marking_win, cv::Scalar(0,255,0), 1);
-					// cv::Mat disp_tmp;
-					// resize(disp_src, disp_tmp, cv::Size(), 0.25, 0.25, cv::INTER_LINEAR);
-					// cv::imshow("Center of Mass", disp_src);
-					// cv::waitKey();
+					cv::Mat disp_tmp;
+					resize(disp_src, disp_tmp, cv::Size(), 0.25, 0.25, cv::INTER_LINEAR);
+					/*cv::imshow("Center of Mass", disp_src);
+					cv::waitKey();*/
 					// Append only the center of mass
 					idxList[line_i].push_back(mass_center);
 				}
@@ -1890,13 +1982,13 @@ namespace roadmarking
 			// for(size_t i =0; i < fitRes.size(); i++){
 			// 	cout << "Fit Point : " << fitRes[i] << endl;
 			// }
-			cv::polylines(disp_src, idxList[line_i], false, cv::Scalar(0,255,0),2);
-			cv::Mat disp_tmp;
-			// resize(disp_src, disp_tmp, cv::Size(), 0.25, 0.25, cv::INTER_LINEAR);
-			//cv::imshow("PolyLine result", disp_src);
+			//cv::polylines(disp_src, idxList[line_i], false, cv::Scalar(0,255,0),2);
+			//cv::Mat disp_tmp;
+			//resize(disp_src, disp_tmp, cv::Size(), 0.25, 0.25, cv::INTER_LINEAR);
+			cv::imshow("laneMat Pixels", laneMat);
 			//cv::waitKey();
 		}
-		return idxList;
+		return laneMat;
 	}
 
 	// Is the error proportional to significance of the y or not ?
@@ -2146,7 +2238,30 @@ namespace roadmarking
 		cout << "TP, TN, FP, FN : " << to_string(TP) << " , " << to_string(TN) << " , " << to_string(FP) << " , " << to_string(FN) << " , " << endl;
 		double IoU = TP / double(TP + FP + FN);
 		cout << "IoU : " << IoU << endl;
-		visualizePredToGT(pcGT);
+		//visualizePredToGT(pcGT);
+	}
+
+	void Imageprocess::generatePredictionPC(const cv::Mat & imgFilled, const pcXYZIPtr &cloud, pcXYZRGBPtr& pcPred){
+		
+		for (size_t i = timin; i < timin + imgFilled.rows; i++)
+		{
+			for (size_t j = tjmin; j < tjmin + imgFilled.cols; j++)
+			{
+				if (imgFilled.at<uchar>(i - timin, j - tjmin) == 1)
+				{
+					for(auto k = GCMatrixIndice[i][j].begin(); k != GCMatrixIndice[i][j].end(); k++){
+						pcl::PointXYZRGB predPoint;
+						predPoint.x = cloud->points[*k].x;
+						predPoint.y = cloud->points[*k].y;
+						predPoint.z = cloud->points[*k].z;
+						predPoint.r = 255.0;
+						pcPred->points.push_back(predPoint);
+					}
+				}
+			}
+		}
+
+		visualizePredToGT(pcPred);
 	}
 
 	void Imageprocess::visualizePredToGT (const pcXYZRGBPtr & IoU){
