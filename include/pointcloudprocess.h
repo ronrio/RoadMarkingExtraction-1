@@ -53,7 +53,7 @@ namespace roadmarking
 
 		void BoundingInformation(const vector<pcXYZI> &clouds, vector<vector<pcl::PointXYZI>> & boundingdatas); //bounding 4 points 
 		void BoundingFeatureCalculation(const vector<vector<pcl::PointXYZI>> & boundingdatas, vector<BoundingFeature> & boundingfeatures); //bounding 4 points
-		void BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, pcXYZRGBPtr pcGT, int down_rate=1, float alpha_value_scale = 0.8);                 
+		void BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, pcXYZRGBPtr pcGT, int down_rate=1, float alpha_value_scale = 0.8, bool VISUALIZE = true);                 
 		void BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, int down_rate=1, float alpha_value_scale = 0.8);                 
 		void CornerExtraction(const vector<pcXYZI> &boundaryclouds, vector<pcXYZI> &cornerclouds, bool UseRadius, int K, float radius, float dis_threshold, float maxcos);     
 		
@@ -80,9 +80,9 @@ namespace roadmarking
 		// https://stackoverflow.com/questions/34481190/removing-duplicates-of-3d-points-in-a-vector-in-c
 
 		void getClassificationResult(pcXYZRGBPtr pcGT, const vector<pcXYZI> &outclouds);
-		vector<DashMarking> EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds);
-		vector<DashMarking> EstimateEndPointsGT(pcXYZRGBPtr pcGT, const pcXYZIPtr &cloud, const vector<int> &gtLabels);
-		void mapMatch(const vector<DashMarking> & gtMarks, const vector<DashMarking> & predMarks, bool SHOW_DISTANCE, pcXYZRGBPtr pcGT);
+		vector<DashMarking> EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds, bool VISUALIZE);
+		vector<DashMarking> EstimateEndPointsGT(pcXYZRGBPtr pcGT, const pcXYZIPtr &cloud, const vector<int> &gtLabels, bool VISUALIZE);
+		void mapMatch(const vector<DashMarking> & gtMarks, const vector<DashMarking> & predMarks, bool SHOW_DISTANCE, pcXYZRGBPtr pcGT, bool VISUALIZE);
 
 		
 	protected:

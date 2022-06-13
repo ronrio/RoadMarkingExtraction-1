@@ -2235,9 +2235,25 @@ namespace roadmarking
 				}
 			}
 		}
-		cout << "TP, TN, FP, FN : " << to_string(TP) << " , " << to_string(TN) << " , " << to_string(FP) << " , " << to_string(FN) << " , " << endl;
+
 		double IoU = TP / double(TP + FP + FN);
-		cout << "IoU : " << IoU << endl;
+
+		ofstream fout;
+		string fileName = "classification_scores.txt";
+
+		fout.open(fileName, std::ios_base::app);
+
+		if(fout.is_open()){
+			fout << "TP, TN, FP, FN : " << to_string(TP) << " , " << to_string(TN) << " , " << to_string(FP) << " , " << to_string(FN) << " , " << endl;
+			fout << "IoU : " << IoU << endl;
+		}
+		else{
+                cout << "File: " << fileName << " could not be opened." << endl;
+            
+		}
+		fout.close();
+
+		
 		//visualizePredToGT(pcGT);
 	}
 

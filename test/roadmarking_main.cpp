@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
                 std::cout << "The name of the loaded file is : "
                         << filename
                         << std::endl;
-                gtMarks = seg.EstimateEndPointsGT(pcGT, cloud, io.groundTruth.groundTruthVals);
+                gtMarks = seg.EstimateEndPointsGT(pcGT, cloud, io.groundTruth.groundTruthVals, io.paralist.visualization_on);
                 cout << "====================================================================" << endl;
                 cout << "Number of Ground Truth Dashed Marking Segments are : " << gtMarks.size() << endl;
             }
@@ -166,7 +166,28 @@ int main(int argc, char *argv[])
         }
     else 
         printf("Unrecognized data format. Please use *.pcd or *.las format point cloud.\n");
+
+    //Print info of the strip processed for reference in the result section
     
+    ofstream areaFile, processTimeFile;
+
+    areaFile.open("area_info.txt", std::ios_base::app);
+    processTimeFile.open("time_info.txt", std::ios_base::app);
+
+    if(areaFile.is_open()){
+            areaFile << "X min: " << bound_3d_temp.min_x << endl;
+            areaFile << "X max: " << bound_3d_temp.max_x << endl; 
+            areaFile << "Y min: " << bound_3d_temp.min_y << endl;
+            areaFile << "Y max: " << bound_3d_temp.max_y << endl;
+            areaFile << "====================================================================" << endl;
+    }
+    else{
+            cout << "File: " << "area_info.txt" << " could not be opened." << endl;
+        
+    }
+    
+    areaFile.close();
+
     X_origin = 0.5 * (bound_3d_temp.min_x + bound_3d_temp.max_x);
     Y_origin = 0.5 * (bound_3d_temp.min_y + bound_3d_temp.max_y); 
     cout << "Import [" << cloud->size() << "] points." << endl;
@@ -183,10 +204,25 @@ int main(int argc, char *argv[])
     StructOperator so;
     Bounds bounds;
     CenterPoint center;
+
+    std::chrono::steady_clock::time_point tic_gf = std::chrono::steady_clock::now();
+
     so.getBoundAndCenter(*cloud, bounds, center);
     ground.Extract_ground_pts(cloud, gcloud, ngcloud, bounds, center);
     // cout << "Ground: " << gcloud->points.size() << ", "
     //      << "Non-Ground: " << ngcloud->points.size() << endl;
+
+    std::chrono::steady_clock::time_point toc_gf = std::chrono::steady_clock::now();
+    std::chrono::duration<double> time_used_gf = std::chrono::duration_cast<std::chrono::duration<double>>(toc_gf - tic_gf);
+
+    if(processTimeFile.is_open()){
+            processTimeFile << "Ground Filtering Processing Time : " << time_used_gf.count() << endl;
+    }
+    else{
+            cout << "File: " << "time_info.txt" << " could not be opened." << endl;
+        
+    }
+
     cout << "Ground Segmentation done.\n";
 
     //Method 2: PMF (Slow)
@@ -206,6 +242,8 @@ int main(int argc, char *argv[])
     //io.displayGroundwithIntensities(fitcloud, 0.3, 0);
 
     //Step 4. 3D->2D projection, Generating Projection Image
+    std::chrono::steady_clock::time_point tic_gRef = std::chrono::steady_clock::now();
+
     Imageprocess ip;
     // Extract the ground truth endpoints
     if(!IS_SPARSE){
@@ -228,8 +266,9 @@ int main(int argc, char *argv[])
         imwrite("after_morph_dilate.png", imgI_morph);
         imgI = imgI_morph;
     }
-		// dilate(imgIbfilter, dilateImg, Mat(),element);
-		//erode(dilateImg, closeImg, Mat());  // ->closeImg
+	
+    // dilate(imgIbfilter, dilateImg, Mat(),element);
+	//erode(dilateImg, closeImg, Mat());  // ->closeImg
     // resize(imgI, imgI_tmp, Size(), 0.25, 0.25, INTER_LINEAR);
     // resize(imgI_morph, imgI_morph, Size(), 0.25, 0.25, INTER_LINEAR);
     // imwrite("before_morph.png", imgI_tmp);
@@ -255,8 +294,6 @@ int main(int argc, char *argv[])
         medianBlur(imgI, imgImf, 3); // Remove the salt and pepper noise
     else if (datatype == 2)
         imgImf = imgI; // For ALS
-    
-
 
     //5.1.2 Sobel gradient calculation and boundary extraction
     // Image 5
@@ -318,6 +355,11 @@ int main(int argc, char *argv[])
     // Timg = imgIbinary;
     //ip.Truncate(imgIbfilter, Timg); //may encounter some problem (OpenCV Error: Assertion failed)
     ip.ImgFilling(imgIbfilter, imgFilled, io.paralist.HC, IS_SPARSE); //Filling the holes inside the markings (Optional)
+
+    /*//Try Opening Operation over the binary image
+    Mat open_element = getStructuringElement(MORPH_CROSS, Size(3, 3));
+    morphologyEx(imgFilled, imgFilled, MORPH_OPEN, open_element);*/
+
     // ip.labelMarkingsPC(imgFilled); //Classify marking points
     // Image 11
     //ip.CcaBySeedFill(Timg, labelImg);
@@ -338,6 +380,18 @@ int main(int argc, char *argv[])
     //ip.img2pc_g(colorLabelImg, gcloud, outcloud);                //Ground Road Marking Points (All in one)
     ip.img2pclabel_g(labelImg, gcloud, outclouds, 0.2); // resolution / 5, 0.2 //Ground Road Marking Points (Segmentation) //Elevation filter: the last parameter is set as the dZ threshold for single pixel
 
+
+    std::chrono::steady_clock::time_point toc_gRef = std::chrono::steady_clock::now();
+    std::chrono::duration<double> time_used_gRef = std::chrono::duration_cast<std::chrono::duration<double>>(toc_gRef - tic_gRef);
+
+    if(processTimeFile.is_open()){
+            processTimeFile << "Geo-referenced Image Processing Time : " << time_used_gRef.count() << endl;
+    }
+    else{
+            cout << "File: " << "time_info.txt" << " could not be opened." << endl;
+        
+    }
+
     /*cout << "The total number of clusters found are : " << outclouds.size() << endl;
     for(size_t i = 0; i < outclouds.size(); i++){
         cout << "Number of points in cluster " << i << " are " << outclouds[i].size() << endl;
@@ -345,6 +399,9 @@ int main(int argc, char *argv[])
 
     //Use Otsu (Intensity) Method and Statistics Outlier Remover to filter the point cloud
     // Add number of neighbourhood as parameter as the program crashes if there are clusters below that number
+
+    std::chrono::steady_clock::time_point tic_ext = std::chrono::steady_clock::now();
+
     seg.cloudFilter(outclouds, outcloud_otsu_sor, 256, 10, 2.5); // Three parameters: the first is for the histogram level of Otsu Thresholding , the second is for SOR neighbor number and the third is for SOR std threshold
 
     // Evaluate the marking using the intensity threshold of the Otsu method
@@ -368,24 +425,30 @@ int main(int argc, char *argv[])
     //7.1 Boundary and Corner Extraction (Optional)
     // Boundary Extraction: Alpha-Shape Concave Hull Generation
     if(!IS_SPARSE){
-        seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, pcGT, 1, 0.5);
+        seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, pcGT, 1, 0.5, io.paralist.visualization_on);
 
-        predMarks = seg.EstimateEndPoints(pcGT, boundaryclouds);
+        predMarks = seg.EstimateEndPoints(pcGT, boundaryclouds, io.paralist.visualization_on);
         cout << "====================================================================" << endl;
         cout << "Number of Predicted Dashed Marking Segments are : " << predMarks.size() << endl;
-
-        // Apply Map Matching
-        seg.mapMatch(gtMarks, predMarks, SHOW_DISTANCE, pcGT);
-
     }
     else
         {
             seg.BoundaryExtraction(outcloud_otsu_sor_n, boundaryclouds, 1, 0.5);
-            predMarks = seg.EstimateEndPoints(pcPred, boundaryclouds);
+            predMarks = seg.EstimateEndPoints(pcPred, boundaryclouds, io.paralist.visualization_on);
         }
 
+    std::chrono::steady_clock::time_point toc_ext = std::chrono::steady_clock::now();
+    std::chrono::duration<double> time_used_ext = std::chrono::duration_cast<std::chrono::duration<double>>(toc_ext - tic_ext);
 
-    // Corner Extraction: Neighborhood Processing
+    if(processTimeFile.is_open()){
+            processTimeFile << "Endpoint Extraction Time : " << time_used_ext.count() << endl;
+    }
+    else{
+            cout << "File: " << "time_info.txt" << " could not be opened." << endl;
+        
+    }
+
+    /*// Corner Extraction: Neighborhood Processing
     // seg.CornerExtraction(boundaryclouds,cornerclouds,1,8,0.1,0.02,0.95); // Parameters: 1/0 Use Radius Search or KNN, 8, KNN's K, 0.15 search radius , 0.02 distance threshold, 0.94 maxcos
     cout << "Find [" << boundaryclouds.size() << "] candidate roadmarkings\n";
 
@@ -410,9 +473,9 @@ int main(int argc, char *argv[])
 
     cout << "Irregular roadmarking classification by model matching done.\n";
 
-    cout << "Roadmarking extraction done, [" << roadmarkings.size() << "] in total.\n";
+    cout << "Roadmarking extraction done, [" << roadmarkings.size() << "] in total.\n";*/
 
-    //Step 8. Vectorization
+    /*//Step 8. Vectorization
     // the parameters are set as the linear sample distance and ambiguous ratio for long side line vectorization
     if (roadtype == 1)
         seg.MarkingVectorization_highway(boundaryclouds, boundingdatas, roadmarkings, io.paralist.sideline_vector_distance, 0.2);
@@ -422,10 +485,43 @@ int main(int argc, char *argv[])
     seg.CombineSideLines(roadmarkings, io.paralist.sideline_vector_distance, sideline_roadmarkings); //Side lines Combination
     seg.GetRoadmarkingsForVect(roadmarkings, sideline_roadmarkings, roadmarkings_vect);
 
-    cout << "Roadmarking vectorization done, [" << roadmarkings_vect.size() << "] in total\n";
+    cout << "Roadmarking vectorization done, [" << roadmarkings_vect.size() << "] in total\n";*/
 
     std::chrono::steady_clock::time_point toc = std::chrono::steady_clock::now();
     std::chrono::duration<double> time_used = std::chrono::duration_cast<std::chrono::duration<double>>(toc - tic);
+
+    if(processTimeFile.is_open()){
+            processTimeFile << "Full Execution Time : " << time_used.count() << endl;
+            processTimeFile << "00000000000000000000000000000000000000000000000000000000000000000" << endl;
+    }
+    else{
+            cout << "File: " << "time_info.txt" << " could not be opened." << endl;
+        
+    }
+
+
+    if(!IS_SPARSE){
+
+        std::chrono::steady_clock::time_point tic_map = std::chrono::steady_clock::now();
+
+
+        // Apply Map Matching
+        seg.mapMatch(gtMarks, predMarks, SHOW_DISTANCE, pcGT, io.paralist.visualization_on);
+
+        std::chrono::steady_clock::time_point toc_map = std::chrono::steady_clock::now();
+        std::chrono::duration<double> time_used_map = std::chrono::duration_cast<std::chrono::duration<double>>(toc_map - tic_map);
+
+        if(processTimeFile.is_open()){
+                processTimeFile << "Map Matching Execution Time : " << time_used_map.count() << endl;
+        }
+        else{
+                cout << "File: " << "time_info.txt" << " could not be opened." << endl;
+            
+        }
+        
+    }
+
+    processTimeFile.close();
 
     /*------------------------------------------------Output----------------------------------------------------*/
     //Step 9. Output Result
@@ -445,11 +541,11 @@ int main(int argc, char *argv[])
     // You can view the results in CloudCompare or AutoDesk Recap
     // io.writePcdAll(outputFilePath+"/Filtered_Labeled_Clouds", "filtered_labeled.pcd", outcloud_otsu_sor_n);
     // io.writePcdAll(output_sub_folder+"/Boundary_Clouds", "boundary.pcd", boundaryclouds);
-    io.writeLasAll(0, output_sub_folder + "/Classified_Road_Markings", outcloud_otsu_sor_n, roadmarkings, X_origin, Y_origin);
+    //io.writeLasAll(0, output_sub_folder + "/Classified_Road_Markings", outcloud_otsu_sor_n, roadmarkings, X_origin, Y_origin);
 
     //Output vectorization results
     //You can view the results on https://beta.sharecad.org/ or in AutoCAD
-    io.writemarkVectDXF(0, output_sub_folder + "/Vectorized_Road_Markings", roadmarkings, sideline_roadmarkings, X_origin, Y_origin); //*.dxf format
+    //io.writemarkVectDXF(0, output_sub_folder + "/Vectorized_Road_Markings", roadmarkings, sideline_roadmarkings, X_origin, Y_origin); //*.dxf format
     //io.writeRoadmarkingShpWithOffset(outputFilePath, roadmarkings_vect, i, X_origin, Y_origin); //*.shp format
 
     //timing

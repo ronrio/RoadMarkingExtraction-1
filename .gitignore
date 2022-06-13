@@ -45,6 +45,8 @@ bin/roadmarking
 
 #JPG image
 *.jpg
+*.png
+
 
 *.cpp.o
 

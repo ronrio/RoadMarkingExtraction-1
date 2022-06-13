@@ -1210,9 +1210,8 @@ namespace roadmarking
 		*/
 	}
 	// https://stackoverflow.com/questions/59395218/pcl-scale-two-point-clouds-to-the-same-size
-	vector<DashMarking> Csegmentation::EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds){
-	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("End points Cloud"));
-	viewer->setBackgroundColor(255, 255, 255);
+	vector<DashMarking> Csegmentation::EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds, bool VISUALIZE){
+	
     pcl::PCA<pcl::PointXYZI> pca;
     
 	pcl::PointXYZI MeanPoint, StartPoint, EndPoint;
@@ -1235,11 +1234,27 @@ namespace roadmarking
 		{
 			pcl::getMinMax3D(projected, goldenMin, goldenMax);
 
-			double dy = goldenMax.y - goldenMin.y;
+			/*double dy = goldenMax.y - goldenMin.y;
 
 			// Get the mid value of the secondry axis of the PCA
 			goldenMin.y = goldenMin.y + dy / 2.0;
-			goldenMax.y = goldenMin.y;
+			goldenMax.y = goldenMin.y;*/
+
+			// Get the mean value in the eigenspace to assign the y and z values
+			Eigen::Vector4f& meanPointRef = pca.getMean();
+			pcl::PointXYZI meanPoint;
+
+			meanPoint.x = meanPointRef[0];
+			meanPoint.y = meanPointRef[1];
+			meanPoint.z = meanPointRef[2];
+
+			pca.project(meanPoint, meanPoint);
+
+			goldenMin.y = meanPoint.y;
+			goldenMin.z = meanPoint.z;
+
+			goldenMax.y = meanPoint.y;
+			goldenMax.z = meanPoint.z;
 
 			//cout << "Get the variance in the second axis: " << pca.getEigenValues()[1] << endl;
 			pca.reconstruct(goldenMin, StartPoint);
@@ -1283,6 +1298,7 @@ namespace roadmarking
 
 	// Filter segments that does not look like dashed markings
 	double lb1 = 2, lb2 = 5;
+	int short_lines = 0;
 	for(int i = 0; i < startPoints.size(); i++){
 
 		pca.setInputCloud(boundaryclouds[bc[i]].makeShared());
@@ -1296,21 +1312,30 @@ namespace roadmarking
 			endPoints.erase(endPoints.begin()+i);
 			bc.erase(bc.begin()+i);
 			i--;
+			short_lines++;
 		}
 	}
 
-	for(int i = 0; i < startPoints.size(); i++){
-		viewer->addSphere(startPoints[i], 0.2, 1.0, 0.0, 0.0, "Start Point:" + to_string(i));
-    	viewer->addSphere(endPoints[i], 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
-	}
+	cout << "Number of segments rejected by their segment length are : " << short_lines << endl;
 
-	viewer->addPointCloud(pcGT, "PointCloud Reference");
-    cout << "Click X(close) to continue..." << endl;
-		while (!viewer->wasStopped())
-		{
-			viewer->spinOnce(100);
-			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+	
+	if(VISUALIZE){
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("End points Cloud"));
+		viewer->setBackgroundColor(255, 255, 255);
+
+		for(int i = 0; i < startPoints.size(); i++){
+			viewer->addSphere(startPoints[i], 0.2, 1.0, 0.0, 0.0, "Start Point:" + to_string(i));
+			viewer->addSphere(endPoints[i], 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
 		}
+
+		viewer->addPointCloud(pcGT, "PointCloud Reference");
+		cout << "Click X(close) to continue..." << endl;
+			while (!viewer->wasStopped())
+			{
+				viewer->spinOnce(100);
+				boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+			}
+	}
 	for(int i = 0; i < startPoints.size(); i++){
 			DashMarking dashLine;
 			dashLine.startPoint = startPoints[i];
@@ -1366,19 +1391,29 @@ namespace roadmarking
 		return sqrt(pow(hypotenuse, 2) - pow(side, 2));
 	}
 
-	void Csegmentation::mapMatch(const vector<DashMarking> & gtMarks, const vector<DashMarking> & predMarks, bool SHOW_DISTANCE, pcXYZRGBPtr pcGT){
+	void Csegmentation::mapMatch(const vector<DashMarking> & gtMarks, const vector<DashMarking> & predMarks, bool SHOW_DISTANCE, pcXYZRGBPtr pcGT, bool VISUALIZE){
 
+		//Save number of GT segments
+		ofstream gtFile;
+
+		gtFile.open("num_GT.txt", ios::app);
 		
+		if(gtFile.is_open())
+			gtFile << gtMarks.size() << endl;
+		else
+            cout << "File: " << "num_GT.txt" << " could not be opened." << endl;
+
+		gtFile.close();
+
         vector<vector<double>> costMatrix;
         vector<vector<DashMarkProps>> propsMatrix;
 		vector<double> minAssignee;
 
         //Paramters for Map Matching
         double angle_coeff = 100;
-        double limit_endpoint_dist = 0.5;
 
 		//minimum acceptable cost between a prediction and ground truth to judge whether to include it in the assignment problem or not
-		double MIN_ACCEPT = angle_coeff / 5;
+		double MIN_ACCEPT = 1; // 1m
 
         costMatrix.resize(predMarks.size(), vector<double>(gtMarks.size()));
         propsMatrix.resize(predMarks.size(), vector<DashMarkProps>(gtMarks.size()));
@@ -1388,7 +1423,6 @@ namespace roadmarking
         for(int i = 0; i < predMarks.size(); i++){
 			double MIN_COST = FLT_MAX;
 
-			//TODO: Better implementation to filter out predictions far from everything
             for(int j = 0; j < gtMarks.size(); j++){
                 
                 DashMarkProps dmp;
@@ -1414,9 +1448,11 @@ namespace roadmarking
                 //cout << "Angle between two markings : " << angle << endl;
                 dmp.cost = dmp.startCost + dmp.endCost +  dmp.angle;
 
-				if(MIN_COST > dmp.cost)
+				double avg_cost = (dmp.startCost + dmp.endCost) / 2;
+
+				if(MIN_COST > avg_cost)
 				{
-					MIN_COST = dmp.cost;
+					MIN_COST = avg_cost;
 				}
 
                 costMatrix[i][j] =  dmp.cost;
@@ -1427,17 +1463,22 @@ namespace roadmarking
 
 		//Refine cost matrix from false positives
 		int i_tmp = 0;
+		int rej_min_assignment = 0;
+
 		for(int i = 0; i < minAssignee.size(); i++){
 
 			if(minAssignee[i] > MIN_ACCEPT){
 				costMatrix.erase(costMatrix.begin()+i_tmp);
 				propsMatrix.erase(propsMatrix.begin()+i_tmp);
 				i_tmp--;
+				rej_min_assignment++;
 			}
 			
 			i_tmp++;
 
 		}
+
+		cout << "Number of predictions rejected by minimum cost to GT: " << rej_min_assignment << endl;
 
         HungarianAlgorithm HungAlgo;
         vector<int> assignment;
@@ -1455,53 +1496,70 @@ namespace roadmarking
 			
 		}
 
-		//TODO: factor out the visualizations
-        boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Matching Result"));
-        viewer->setBackgroundColor(255, 255, 255);
-
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Matching Result"));
+		if(VISUALIZE){
+        	viewer->setBackgroundColor(255, 255, 255);
+		}
         double effective_cost = 0;
 
 		int x_tmp = 0;
+		
+		int tot_assigned = 0;
+		
 		for (unsigned int x = 0; x < assignment.size(); x++){
 
 		if (assignment[x] >= 0){
 
-			//bool start_condition = propsMatrix[x][assignment[x]].startCost < limit_endpoint_dist;
-        	//bool end_condition = propsMatrix[x][assignment[x]].endCost < limit_endpoint_dist;
-
-		//&& start_condition && end_condition){ //To avoid invalid assignment to -1 when number of GTs are less than predictions
 			float r = (rand() / (1.0 + RAND_MAX));
 			float g = (rand() / (1.0 + RAND_MAX)); 
 			float b = (rand() / (1.0 + RAND_MAX));
 
-			viewer->addSphere(predMarks[x].startPoint, 0.2, r, g, b, "Start Point:" + to_string(x));
-			viewer->addSphere(predMarks[x].endPoint, 0.2, r, g, b, "End Point:" + to_string(x));
+			if(VISUALIZE){
+				viewer->addSphere(predMarks[x].startPoint, 0.2, r, g, b, "Start Point:" + to_string(x));
+				viewer->addSphere(predMarks[x].endPoint, 0.2, r, g, b, "End Point:" + to_string(x));
 
-			viewer->addSphere(gtMarks[assignment[x]].startPoint, 0.2, r, g, b, "Start PointGT:" + to_string(assignment[x]));
-			viewer->addSphere(gtMarks[assignment[x]].endPoint, 0.2, r, g, b, "End PointGT:" + to_string(assignment[x]));
+				viewer->addSphere(gtMarks[assignment[x]].startPoint, 0.2, r, g, b, "Start PointGT:" + to_string(assignment[x]));
+				viewer->addSphere(gtMarks[assignment[x]].endPoint, 0.2, r, g, b, "End PointGT:" + to_string(assignment[x]));
 
-			if(SHOW_DISTANCE){
-				viewer->addArrow(predMarks[x].startPoint, predMarks[x].endPoint, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, "Pred Segment" + to_string(x));
-				viewer->addArrow(gtMarks[assignment[x]].startPoint, gtMarks[assignment[x]].endPoint, 0.5, 1.0, 0.25, 0.5, 1.0, 0.25, "GT Segment" + to_string(assignment[x]));
+				if(SHOW_DISTANCE){
+					viewer->addArrow(predMarks[x].startPoint, predMarks[x].endPoint, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, "Pred Segment" + to_string(x));
+					viewer->addArrow(gtMarks[assignment[x]].startPoint, gtMarks[assignment[x]].endPoint, 0.5, 1.0, 0.25, 0.5, 1.0, 0.25, "GT Segment" + to_string(assignment[x]));
+				}
 			}
 			effective_cost += propsMatrix[x_tmp][assignment[x]].cost;
-			 
+			tot_assigned++;
+
 			x_tmp++;
 			}
 			else if(assignment[x] != -2){ //To avoid the case when there are not enough ground truth and assignment is -1 instead
 				x_tmp++;
 			}
 		}
-
-		viewer->addPointCloud(pcGT, "PointCloud Reference");
-        cout << "Click X(close) to continue..." << endl;
-            while (!viewer->wasStopped())
-            {
-                viewer->spinOnce(100);
-                boost::this_thread::sleep(boost::posix_time::microseconds(100000));
-            }
-
+		if(VISUALIZE){
+			viewer->addPointCloud(pcGT, "PointCloud Reference");
+			cout << "Click X(close) to continue..." << endl;
+				while (!viewer->wasStopped())
+				{
+					viewer->spinOnce(100);
+					boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+				}
+		}
         std::cout << "\nCost is : " << effective_cost << std::endl;
+
+		//Save number of assigned segments
+		ofstream assignFile;
+
+		assignFile.open("num_assigned.txt", std::ios_base::app);
+
+		if(assignFile.is_open()){
+				assignFile << tot_assigned << endl; 
+		}
+		else{
+                cout << "File: " << "num_assigned.txt" << " could not be opened." << endl;
+            
+		}
+
+		assignFile.close();
 
 		//Save assignment error for modeling it in Python Notebook
 		outputError(propsMatrix, assignment);
@@ -1509,11 +1567,12 @@ namespace roadmarking
 
 	void Csegmentation::writeCostFile(const vector<double>& costList, string fileName){
 
-		ofstream fout(fileName);
+		ofstream fout;
+
+		fout.open(fileName, std::ios_base::app);
 
 		if(fout.is_open()){
 			for (unsigned int x = 0; x < costList.size(); x++)
-
 				fout << costList[x] << endl; 
 		}
 		else{
@@ -1541,13 +1600,15 @@ namespace roadmarking
         for (unsigned int x = 0; x < assignment.size(); x++)
         {
 			if (assignment[x] >= 0 ){
-				startCosts.push_back(propsMatrix[x_tmp][assignment[x]].startCost);
-				avgCosts.push_back((propsMatrix[x_tmp][assignment[x]].startCost + propsMatrix[x_tmp][assignment[x]].endCost) / 2);
-				endCosts.push_back(propsMatrix[x_tmp][assignment[x]].endCost);
-				totCosts.push_back(propsMatrix[x_tmp][assignment[x]].cost);
-				angleCosts.push_back(propsMatrix[x_tmp][assignment[x]].angle);
-				orthoCosts.push_back(propsMatrix[x_tmp][assignment[x]].orthoAvgCost);
-				headCosts.push_back(propsMatrix[x_tmp][assignment[x]].HeadAvgCost);
+				if(propsMatrix[x_tmp][assignment[x]].cost < 10){
+					startCosts.push_back(propsMatrix[x_tmp][assignment[x]].startCost);
+					avgCosts.push_back((propsMatrix[x_tmp][assignment[x]].startCost + propsMatrix[x_tmp][assignment[x]].endCost) / 2);
+					endCosts.push_back(propsMatrix[x_tmp][assignment[x]].endCost);
+					totCosts.push_back(propsMatrix[x_tmp][assignment[x]].cost);
+					angleCosts.push_back(propsMatrix[x_tmp][assignment[x]].angle);
+					orthoCosts.push_back(propsMatrix[x_tmp][assignment[x]].orthoAvgCost);
+					headCosts.push_back(propsMatrix[x_tmp][assignment[x]].HeadAvgCost);
+				}
 				x_tmp++;
 			}
 			else if(assignment[x] != -2){ //To avoid the case when there are not enough ground truth and assignment is -1 instead
@@ -1564,7 +1625,7 @@ namespace roadmarking
 		writeCostFile(headCosts, head_cost);
     }
 
-	vector<DashMarking> Csegmentation::EstimateEndPointsGT(pcXYZRGBPtr pcGT, const pcXYZIPtr &cloud, const vector<int> &gtLabels){
+	vector<DashMarking> Csegmentation::EstimateEndPointsGT(pcXYZRGBPtr pcGT, const pcXYZIPtr &cloud, const vector<int> &gtLabels, bool VISULIZE){
 		pcXYZIPtr markingC(new pcXYZI());
 		vector<pcXYZI> markingsGT, boundaryclouds;
 		
@@ -1580,8 +1641,8 @@ namespace roadmarking
 		std::vector<pcl::PointIndices> cluster_indices;
 
 		pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
-		ec.setClusterTolerance (0.2); // 20cm
-		ec.setMinClusterSize (100);
+		ec.setClusterTolerance (0.25); // 25cm
+		ec.setMinClusterSize (200);
 		ec.setMaxClusterSize (250000);
 		ec.setSearchMethod (tree);
 		ec.setInputCloud (markingC);
@@ -1602,12 +1663,12 @@ namespace roadmarking
 			j++;
   		}
 
-		BoundaryExtraction(markingsGT, boundaryclouds, pcGT, 1, 1);
-		return EstimateEndPoints(pcGT, boundaryclouds);
+		BoundaryExtraction(markingsGT, boundaryclouds, pcGT, 1, 1, VISULIZE);
+		return EstimateEndPoints(pcGT, boundaryclouds, VISULIZE);
 	}
 
 
-	void Csegmentation::BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, pcXYZRGBPtr pcGT , int down_rate, float alpha_value_scale)
+	void Csegmentation::BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, pcXYZRGBPtr pcGT , int down_rate, float alpha_value_scale, bool VISUALIZE)
 	{
 		boundaryclouds.resize(clouds.size());
 		int i;
@@ -1626,9 +1687,11 @@ namespace roadmarking
 			}
 			tempcloud->points.swap(boundaryclouds[i].points);
 		}
+		if(VISUALIZE){
 		// pcXYZRGBPtr boundC(new pcXYZRGB);
 		// visualizeConcaveHullBoundries(pcGT, boundaryclouds);
 		//cout << "Boundary Extraction Done" << endl;
+		}
 	}
 
 	void Csegmentation::BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds , int down_rate, float alpha_value_scale)
