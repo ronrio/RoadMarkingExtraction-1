@@ -30,7 +30,7 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #ROOT
 SET(CMAKE_PREFIX_PATH "../ROOT/root_install")
 find_package(ROOT REQUIRED)
-include_directories(${ROOT_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${ROOT_INCLUDE_DIRS})
 message("DEP: ROOT [OK] ")
 
 
@@ -74,7 +74,6 @@ message("SRC_LIST is " ${SRC_LIST})
 SET(DEP_LIBS ${DEP_LIBS} ${OpenCV_LIBS} ${PCL_LIBRARIES} ${libLAS_LIBRARIES} ${ROOT_LIBRARIES})
 
 message("ROOT Libraries are : " ${ROOT_LIBRARIES})
-
 
 add_executable(roadmarking ${PROJECT_SOURCE_DIR}/test/roadmarking_main.cpp ${SRC_LIST})
 target_link_libraries(roadmarking PUBLIC ${DEP_LIBS})

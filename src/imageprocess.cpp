@@ -183,7 +183,9 @@ namespace roadmarking
 		double mini, maxi;	//min and max Intensity
 		double meani, stdi; //mean and standard deviation of Intensity
 		int Number_non_zero_pixel;
+
 		int max_per_cell = INT_MIN, min_per_cell = INT_MAX;
+		float max_global_intensity = FLT_MIN;
 
 		meani = 0;
 		stdi = 0;
@@ -210,7 +212,7 @@ namespace roadmarking
 
 		switch (whatcloud)
 		{
-		case 0: //Original cv::Point Cloud
+		case 0: //Original Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
@@ -220,21 +222,29 @@ namespace roadmarking
 				}
 			}
 			break;
-		case 1: //Ground cv::Point Cloud
+		case 1: //Ground Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
 				{
+					float max_intensity = FLT_MIN;
 					int num_i = 0;
 					for (auto k = GCMatrixIndice[i][j].begin(); k != GCMatrixIndice[i][j].end(); ++k) 
 						{
 							matrixi[i][j].push_back(cloud->points[*k].intensity);
 							num_i++;
+							/*if(max_intensity < cloud->points[*k].intensity)
+								max_intensity = cloud->points[*k].intensity;*/
 						}			
 						if(max_per_cell < num_i)
 							max_per_cell = num_i;
 						if(min_per_cell > num_i)
 							min_per_cell = num_i;
+
+					//ave[i][j] = max_intensity; 
+
+					/*if(max_global_intensity < max_intensity)
+						max_global_intensity = max_intensity;*/
 				}
 			}
 			cout << "=========CELL GRID STATS.=========" << endl;
@@ -242,7 +252,7 @@ namespace roadmarking
 			cout << "Minimum number of PC per cell : " << min_per_cell << endl;
 			cout << "====================================" << endl;
 			break;
-		case 2: //Non-Ground cv::Point Cloud
+		case 2: //Non-Ground Point Cloud
 			for (int i = 0; i < nx; i++)
 			{
 				for (int j = 0; j < ny; j++)
@@ -262,7 +272,7 @@ namespace roadmarking
 			}
 		}
 
-		// Visualizing the intensity matrix
+		/*// Visualizing the intensity matrix
 		cv::Mat matIntensities(ave.size(), ave.at(0).size(), CV_32FC1);
 		//Initialize m
 		double minVal; 
@@ -277,9 +287,10 @@ namespace roadmarking
 		minMaxLoc(matIntensities, &minVal, &maxVal, &minLoc, &maxLoc );
 		cout << "Min Val of intensities: " << minVal << endl;
 		cout << "Max Val of intensities: " << maxVal << endl;
-		/*resize(matIntensities, matIntensities, cv::Size(), 0.75, 0.75, cv::INTER_LINEAR);
+		resize(matIntensities, matIntensities, cv::Size(), 0.75, 0.75, cv::INTER_LINEAR);
 		cv::imshow("Intensity Image Plot ", matIntensities);
 		cv::waitKey(0);*/
+
 	for (int i = 0; i < nx; i++)
 		{
 			for (int j = 0; j < ny; j++)
@@ -321,7 +332,7 @@ namespace roadmarking
 			{
 				if (ave[i][j] > maxi)
 					ave[i][j] = maxi;
-				img.at<uchar>(i, j) = 255 * ave[i][j] / maxi ;
+				img.at<uchar>(i, j) = 255 * ave[i][j] / maxi;
 			}
 		}
 		// cv::imshow("Intensity image after scaling", img);
@@ -667,6 +678,12 @@ namespace roadmarking
 			}
 		}
 		return (targetEntropy + BackgroundEntropy); 
+	}
+
+	cv::Mat Imageprocess::OtsuSegMentation(cv::Mat inputImage){
+		cv::Mat dst;
+		cv::threshold(inputImage, dst, 0, 1, cv::THRESH_BINARY+ cv::THRESH_OTSU);
+		return dst;
 	}
 
 	cv::Mat Imageprocess::maxEntropySegMentation(cv::Mat inputImage)
@@ -1249,7 +1266,7 @@ namespace roadmarking
 		cout << "The maximum value of fill_img: " << maxVal << endl;
 		cout << "The minimum value of fill_img: " << minVal << endl;*/
 
-		if(IS_SPARSE){
+		/*if(IS_SPARSE){
 			vector<cv::Vec2f> houghLines = intensityHoughLineDetector(255 * img_fill,HC);
 			cv::Vec2f trajectory_line = houghLines[0];
 			//TODO: This should consider the resolution of the grid instead of an arbitrary values
@@ -1268,7 +1285,9 @@ namespace roadmarking
 
 			img_fill = recoveredImg / 255;
 			cout << "Image size After Hough " << img_fill.size() << endl;
-		}
+		}*/
+
+
 		// Make sure it has the same dimension as before Hough Transfrom
 		//resize(imgHough, imgHough, cv::Size(orig_img_size.width, orig_img_size.height), cv::INTER_LINEAR);
 
@@ -2205,7 +2224,7 @@ namespace roadmarking
 	// }
 
 
-	void Imageprocess::EvaluateLaneMarkings(const cv::Mat & imgFilled, pcXYZRGBPtr& pcGT){
+	void Imageprocess::EvaluateLaneMarkings(const cv::Mat & imgFilled, pcXYZRGBPtr& pcGT, bool VISUALIZE){
 		size_t TP = 0, TN = 0, FP = 0, FN = 0;
 		//Copy Original point cloud to another with ground truth are shown in red
 		for (size_t i = timin; i < timin + imgFilled.rows; i++)
@@ -2237,6 +2256,7 @@ namespace roadmarking
 		}
 
 		double IoU = TP / double(TP + FP + FN);
+		double recall = TP / double(TP + FN);
 
 		ofstream fout;
 		string fileName = "classification_scores.txt";
@@ -2246,6 +2266,7 @@ namespace roadmarking
 		if(fout.is_open()){
 			fout << "TP, TN, FP, FN : " << to_string(TP) << " , " << to_string(TN) << " , " << to_string(FP) << " , " << to_string(FN) << " , " << endl;
 			fout << "IoU : " << IoU << endl;
+			fout << "Recall: " << recall << endl;
 		}
 		else{
                 cout << "File: " << fileName << " could not be opened." << endl;
@@ -2253,8 +2274,8 @@ namespace roadmarking
 		}
 		fout.close();
 
-		
-		//visualizePredToGT(pcGT);
+		if(VISUALIZE)
+			visualizePredToGT(pcGT);
 	}
 
 	void Imageprocess::generatePredictionPC(const cv::Mat & imgFilled, const pcXYZIPtr &cloud, pcXYZRGBPtr& pcPred){
@@ -2277,7 +2298,7 @@ namespace roadmarking
 			}
 		}
 
-		visualizePredToGT(pcPred);
+		//visualizePredToGT(pcPred);
 	}
 
 	void Imageprocess::visualizePredToGT (const pcXYZRGBPtr & IoU){

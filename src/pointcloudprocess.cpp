@@ -31,11 +31,16 @@ namespace roadmarking
 		pcl::PointIndicesPtr ground_points(new pcl::PointIndices);
 		pcl::ProgressiveMorphologicalFilter<pcl::PointXYZI> pmf;
 		pmf.setInputCloud(cloud);
-		pmf.setMaxWindowSize(20);
-		pmf.setSlope(1.0f);
-		pmf.setInitialDistance(0.5f);
-		pmf.setMaxDistance(3.0f);
+		cout << "Size of the Point Cloud is " << cloud->points.size() << endl;
+		pmf.setMaxWindowSize(1000);
+		pmf.setSlope(0.1f);
+		pmf.setInitialDistance(0.01f);
+		pmf.setMaxDistance(0.1f);
+
+		cout << "PMF process is about to start !" << endl;
 		pmf.extract(ground_points->indices);
+		
+		cout << "PMF process is finished !" << endl;
 
 		// Create the filtering object
 		pcl::ExtractIndices<pcl::PointXYZI> extract;
@@ -43,12 +48,16 @@ namespace roadmarking
 		extract.setIndices(ground_points);
 		extract.filter(*gcloud);
 
+		cout << "Ground Point Cloud is extracted !!" << endl;
+
 		//std::cerr << "Ground cloud after filtering (PMF): " << std::endl;
 		//std::cerr << *gcloud << std::endl;
 
 		// Extract non-ground returns
 		extract.setNegative(true);
 		extract.filter(*ngcloud);
+
+		cout << "Non Ground Point Cloud is extracted !!" << endl;
 
 		//std::cerr << "Non-ground cloud after filtering (PMF): " << std::endl;
 		//std::cerr << *ngcloud << std::endl;
@@ -1345,6 +1354,138 @@ namespace roadmarking
 		return dashPoints;
 	}
 
+	vector<DashMarking> Csegmentation::EstimateEndPoints(const vector<pcXYZI> & boundaryclouds){
+	
+    pcl::PCA<pcl::PointXYZI> pca;
+    
+	pcl::PointXYZI MeanPoint, StartPoint, EndPoint;
+	pcl::PointXYZI goldenMin, goldenMax;
+	pcXYZI projected;
+	vector<pcl::PointXYZI> startPoints, endPoints;
+	vector<DashMarking> dashPoints;
+
+	vector<int> bc;
+    for(int i = 0; i < boundaryclouds.size(); i++){
+		if(boundaryclouds[i].size() > 3){ //This is important for SVD to work, limiting to more points should be applicable as well.
+        
+		pca.setInputCloud(boundaryclouds[i].makeShared());
+		pca.project(boundaryclouds[i], projected);
+
+		//Get the reference aspect ratio of a dashed marking
+		double lv = 4; 
+
+		if (pca.getEigenValues()[1] < lv)
+		{
+			pcl::getMinMax3D(projected, goldenMin, goldenMax);
+
+			/*double dy = goldenMax.y - goldenMin.y;
+
+			// Get the mid value of the secondry axis of the PCA
+			goldenMin.y = goldenMin.y + dy / 2.0;
+			goldenMax.y = goldenMin.y;*/
+
+			// Get the mean value in the eigenspace to assign the y and z values
+			Eigen::Vector4f& meanPointRef = pca.getMean();
+			pcl::PointXYZI meanPoint;
+
+			meanPoint.x = meanPointRef[0];
+			meanPoint.y = meanPointRef[1];
+			meanPoint.z = meanPointRef[2];
+
+			pca.project(meanPoint, meanPoint);
+
+			goldenMin.y = meanPoint.y;
+			goldenMin.z = meanPoint.z;
+
+			goldenMax.y = meanPoint.y;
+			goldenMax.z = meanPoint.z;
+
+			//cout << "Get the variance in the second axis: " << pca.getEigenValues()[1] << endl;
+			pca.reconstruct(goldenMin, StartPoint);
+			pca.reconstruct(goldenMax, EndPoint);
+
+			//viewer->addSphere(StartPoint, 0.2, 1.0, 0.0, 0.0, "Start Point:" + to_string(i));
+    		//viewer->addSphere(EndPoint, 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
+			startPoints.push_back(StartPoint);
+			endPoints.push_back(EndPoint);
+			
+			//Keep track of cloud idx for fusion process later
+			bc.push_back(i);
+			//cout << "The value of the boundry cloud index " << i << endl;
+
+			}	
+		}
+    }
+	cout << "Number of endpoints detected :  " << startPoints.size() << endl;
+
+	double ld = 1;
+	int close_lines = 0;
+
+	if(startPoints.size() > 0){
+	for(int i = 0; i < startPoints.size()-1; i++){
+		for(int j = i+1; j < startPoints.size(); j++){
+			double dist = pcl::euclideanDistance(endPoints[i], startPoints[j]);
+			//cout << "The distance between two endpoints is " << dist << endl;
+			if(dist < ld)
+			{
+				endPoints[i] = endPoints[j];
+				startPoints.erase(startPoints.begin()+j);
+				endPoints.erase(endPoints.begin()+j);
+				bc.erase(bc.begin()+j);
+				j--;
+				close_lines++;
+				}
+			}
+		}
+	}
+
+	cout << "Number of fused markings : " << close_lines << endl;
+
+	// Filter segments that does not look like dashed markings
+	double lb1 = 2, lb2 = 5;
+	int short_lines = 0;
+	for(int i = 0; i < startPoints.size(); i++){
+
+		pca.setInputCloud(boundaryclouds[bc[i]].makeShared());
+		pca.project(startPoints[i], goldenMin);
+		pca.project(endPoints[i], goldenMax);
+
+		double dx = goldenMax.x -  goldenMin.x;
+		//cout << "The length of the marking is : " << dx << endl;
+		if (dx < lb1 || dx > lb2){
+			startPoints.erase(startPoints.begin()+i);
+			endPoints.erase(endPoints.begin()+i);
+			bc.erase(bc.begin()+i);
+			i--;
+			short_lines++;
+		}
+	}
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("End points Cloud"));
+		viewer->setBackgroundColor(255, 255, 255);
+
+		for(int i = 0; i < startPoints.size(); i++){
+			viewer->addSphere(startPoints[i], 0.2, 1.0, 0.0, 0.0, "Start Point:" + to_string(i));
+			viewer->addSphere(endPoints[i], 0.2, 0.0, 0.0, 1.0, "End Point:" + to_string(i));
+		}
+
+		cout << "Click X(close) to continue..." << endl;
+			while (!viewer->wasStopped())
+			{
+				viewer->spinOnce(100);
+				boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+			}
+
+	cout << "Number of segments rejected by their segment length are : " << short_lines << endl;
+
+	for(int i = 0; i < startPoints.size(); i++){
+			DashMarking dashLine;
+			dashLine.startPoint = startPoints[i];
+			dashLine.endPoint = endPoints[i];
+			dashPoints.push_back(dashLine);
+		}
+		return dashPoints;
+	}
+
 	double Csegmentation::estimateSinAngleVec3D(const DashMarking& predInst, const DashMarking& GtInst){
 
 		// Calculate the angle between 3D vectors, A  & B
@@ -1391,6 +1532,11 @@ namespace roadmarking
 		return sqrt(pow(hypotenuse, 2) - pow(side, 2));
 	}
 
+	void Csegmentation::getRandomList(int x_size, vector<float> & list){
+		list.resize(x_size);
+		for (int x = 0; x < list.size(); x++)
+			list[x] = (float) rand()/RAND_MAX;
+	}
 	void Csegmentation::mapMatch(const vector<DashMarking> & gtMarks, const vector<DashMarking> & predMarks, bool SHOW_DISTANCE, pcXYZRGBPtr pcGT, bool VISUALIZE){
 
 		//Save number of GT segments
@@ -1496,7 +1642,8 @@ namespace roadmarking
 			
 		}
 
-		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Matching Result"));
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Map Match"));
+		
 		if(VISUALIZE){
         	viewer->setBackgroundColor(255, 255, 255);
 		}
@@ -1505,24 +1652,28 @@ namespace roadmarking
 		int x_tmp = 0;
 		
 		int tot_assigned = 0;
+
+		vector<float> r,g,b;
+
+		std::srand(static_cast<float>(std::time(nullptr)));
 		
+		getRandomList(assignment.size(), r);
+		getRandomList(assignment.size(), g);
+		getRandomList(assignment.size(), b);
+
 		for (unsigned int x = 0; x < assignment.size(); x++){
 
 		if (assignment[x] >= 0){
 
-			float r = (rand() / (1.0 + RAND_MAX));
-			float g = (rand() / (1.0 + RAND_MAX)); 
-			float b = (rand() / (1.0 + RAND_MAX));
-
 			if(VISUALIZE){
-				viewer->addSphere(predMarks[x].startPoint, 0.2, r, g, b, "Start Point:" + to_string(x));
-				viewer->addSphere(predMarks[x].endPoint, 0.2, r, g, b, "End Point:" + to_string(x));
+				viewer->addSphere(predMarks[x].startPoint, 0.5, r[x], g[x], b[x], "Start Point:" + to_string(x));
+				viewer->addSphere(predMarks[x].endPoint, 0.5, r[x], g[x], b[x], "End Point:" + to_string(x));
 
-				viewer->addSphere(gtMarks[assignment[x]].startPoint, 0.2, r, g, b, "Start PointGT:" + to_string(assignment[x]));
-				viewer->addSphere(gtMarks[assignment[x]].endPoint, 0.2, r, g, b, "End PointGT:" + to_string(assignment[x]));
+				viewer->addSphere(gtMarks[assignment[x]].startPoint, 0.5, r[x], g[x], b[x], "Start PointGT:" + to_string(assignment[x]));
+				viewer->addSphere(gtMarks[assignment[x]].endPoint, 0.5, r[x], g[x], b[x], "End PointGT:" + to_string(assignment[x]));
 
 				if(SHOW_DISTANCE){
-					viewer->addArrow(predMarks[x].startPoint, predMarks[x].endPoint, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, "Pred Segment" + to_string(x));
+				srand(time(NULL));	viewer->addArrow(predMarks[x].startPoint, predMarks[x].endPoint, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, "Pred Segment" + to_string(x));
 					viewer->addArrow(gtMarks[assignment[x]].startPoint, gtMarks[assignment[x]].endPoint, 0.5, 1.0, 0.25, 0.5, 1.0, 0.25, "GT Segment" + to_string(assignment[x]));
 				}
 			}
@@ -1641,8 +1792,8 @@ namespace roadmarking
 		std::vector<pcl::PointIndices> cluster_indices;
 
 		pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
-		ec.setClusterTolerance (0.25); // 25cm
-		ec.setMinClusterSize (200);
+		ec.setClusterTolerance (0.15); // 25cm
+		ec.setMinClusterSize (250);
 		ec.setMaxClusterSize (250000);
 		ec.setSearchMethod (tree);
 		ec.setInputCloud (markingC);
@@ -1668,6 +1819,45 @@ namespace roadmarking
 	}
 
 
+	vector<DashMarking> Csegmentation::EstimateEndPointsLAZY(const pcXYZIPtr &cloud){
+
+		vector<pcXYZI> markingsGT, boundaryclouds;
+
+		// Apply Eculidean Clustering
+		// Creating the KdTree object for the search method of the extraction
+ 		pcl::search::KdTree<pcl::PointXYZI>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZI>);
+		tree->setInputCloud (cloud);
+		std::vector<pcl::PointIndices> cluster_indices;
+
+		pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
+		ec.setClusterTolerance (0.1); // 25cm
+		ec.setMinClusterSize (10);
+		ec.setMaxClusterSize (1000);
+		ec.setSearchMethod (tree);
+		ec.setInputCloud (cloud);
+		ec.extract (cluster_indices);
+
+		int j = 0;
+		int num_cluster = cluster_indices.end () - cluster_indices.begin(); //Get the total number of clusters 
+		markingsGT.resize(num_cluster);
+
+		//cout << "number of clusters :" << num_cluster << endl;
+		for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end(); ++it){
+
+			pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZI>);
+			for (const auto& idx : it->indices)
+				cloud_cluster->push_back ((*cloud)[idx]);
+			cloud_cluster->width = cloud_cluster->size ();
+			cloud_cluster->height = 1;
+			cloud_cluster->is_dense = true;
+			markingsGT[j].points = cloud_cluster->points;
+			j++;
+  		}
+
+		BoundaryExtraction(markingsGT, boundaryclouds, 1, 1);
+		return EstimateEndPoints(boundaryclouds);
+	}
+
 	void Csegmentation::BoundaryExtraction(const vector<pcXYZI> &clouds, vector<pcXYZI> &boundaryclouds, pcXYZRGBPtr pcGT , int down_rate, float alpha_value_scale, bool VISUALIZE)
 	{
 		boundaryclouds.resize(clouds.size());
@@ -1688,8 +1878,7 @@ namespace roadmarking
 			tempcloud->points.swap(boundaryclouds[i].points);
 		}
 		if(VISUALIZE){
-		// pcXYZRGBPtr boundC(new pcXYZRGB);
-		// visualizeConcaveHullBoundries(pcGT, boundaryclouds);
+			//visualizeConcaveHullBoundries(pcGT, boundaryclouds);
 		//cout << "Boundary Extraction Done" << endl;
 		}
 	}
@@ -1725,7 +1914,7 @@ namespace roadmarking
 				boundrypoint.x = boundaryclouds[i].points[j].x;
 				boundrypoint.y = boundaryclouds[i].points[j].y;
 				boundrypoint.z = boundaryclouds[i].points[j].z;
-				viewer->addSphere(boundrypoint, 0.1, "Boundry Point " + to_string(j) + "  " + to_string(i));
+				viewer->addSphere(boundrypoint, 0.05, 1.0, 0, 0, "Boundry Point " + to_string(j) + "  " + to_string(i));
 			}
 		}
 		cout << "Click X(close) to continue..." << endl;
@@ -1958,6 +2147,7 @@ namespace roadmarking
 		cout << "Model inliers number: " << inliers->indices.size() << std::endl;
 		pcXYZIPtr fitcloud(new pcXYZI());
 
+		cout << "About to finish RANSAC !!" << endl;
 		for (size_t i = 0; i < inliers->indices.size(); ++i)
 		{
 			fitcloud->push_back(cloud->points[inliers->indices[i]]);

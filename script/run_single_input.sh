@@ -4,8 +4,8 @@ ground_truth_file=~/Downloads/RoadMarkingExtraction-1/sample_data/Toronto_P3_1.t
 road_type=urban
 
 # Toronto with bigger Point Cloud range
-single_file=~/Downloads/Toronto-3D-Partitioning/PCD-files-clean/Toronto_P2_001_003_exp.pcd
-ground_truth_file=~/Downloads/Toronto-3D-Partitioning/PCD-files-clean/Toronto_P2_001_003_exp.txt
+single_file=~/Downloads/Toronto-3D-Partitioning/PCD-files-clean/Toronto_P3_001_003_exp.pcd
+ground_truth_file=~/Downloads/Toronto-3D-Partitioning/PCD-files-clean/Toronto_P3_001_003_exp.txt
 
 #single_file=~/Downloads/RoadMarkingExtraction-1/sample_data/KITTI_015_3sec.pcd
 

@@ -81,7 +81,9 @@ namespace roadmarking
 
 		void getClassificationResult(pcXYZRGBPtr pcGT, const vector<pcXYZI> &outclouds);
 		vector<DashMarking> EstimateEndPoints(pcXYZRGBPtr pcGT, const vector<pcXYZI> & boundaryclouds, bool VISUALIZE);
+		vector<DashMarking> EstimateEndPoints(const vector<pcXYZI> & boundaryclouds);
 		vector<DashMarking> EstimateEndPointsGT(pcXYZRGBPtr pcGT, const pcXYZIPtr &cloud, const vector<int> &gtLabels, bool VISUALIZE);
+		vector<DashMarking> EstimateEndPointsLAZY(const pcXYZIPtr &cloud);
 		void mapMatch(const vector<DashMarking> & gtMarks, const vector<DashMarking> & predMarks, bool SHOW_DISTANCE, pcXYZRGBPtr pcGT, bool VISUALIZE);
 
 		
@@ -95,6 +97,7 @@ namespace roadmarking
 		void writeCostFile(const vector<double>& costList, string fileName);
 		double estimateOrthogonalCost(const pcl::PointXYZI& predPoint, const DashMarking& gtSegment);
 		double estimateHeadingCost(double side, double hypotenuse);
+		void getRandomList(int x_size, vector<float> & list);
 		
 		
 	};

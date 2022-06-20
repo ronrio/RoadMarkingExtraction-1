@@ -14,6 +14,7 @@ using namespace cv;
 
 int main(int argc, char *argv[])
 {
+
     if (argc < 3)
     {
         printf("Syntax is: %s input_file.las output_folder [model_pool] [config_file]\n", argv[0]);
@@ -116,7 +117,7 @@ int main(int argc, char *argv[])
     Mat imgImf, imgIgradient, imgIgradientroad, imgIbinary, imgZgradient, imgZbinary, imgDbinary, imgIbfilter, labelImg, colorLabelImg, imgFilled, Timg, dilateImg, closeImg, corner, cornerwithimg;
 
     //Dash marking endpoint list for Ground Truth and Predictions
-    vector<DashMarking> gtMarks, predMarks;
+    vector<DashMarking> gtMarks, predMarks, testMarks;
 
     /* imgImf: Intensity Projection Image after Median Filter ;
        imgIgradient: Intensity Gradient Image ;
@@ -158,8 +159,10 @@ int main(int argc, char *argv[])
                         << filename
                         << std::endl;
                 gtMarks = seg.EstimateEndPointsGT(pcGT, cloud, io.groundTruth.groundTruthVals, io.paralist.visualization_on);
+                //testMarks = seg.EstimateEndPointsLAZY(cloud);
                 cout << "====================================================================" << endl;
                 cout << "Number of Ground Truth Dashed Marking Segments are : " << gtMarks.size() << endl;
+                //io.displayRoadwithIntensities(cloud, 1, 10, 10, "Noorio");
             }
             else
                 io.readPcdFile(inputFilePath, cloud, bound_3d_temp);
@@ -226,18 +229,22 @@ int main(int argc, char *argv[])
     cout << "Ground Segmentation done.\n";
 
     //Method 2: PMF (Slow)
-    //seg.GroundFilter_PMF(cloud[i], gcloud, ngcloud);
+    //seg.GroundFilter_PMF(cloud, gcloud, ngcloud);
+    //cout << "PMF is finished !!" << endl;
 
     //Csegmentation seg(resolution);
     //Preprocessing: Segmentation and Fitting (Optional)
     //RANSAC plane segmentation
     //pcXYZIPtr fitcloud(new pcXYZI());
-	//float td = 0.2;
-	//gcloud = seg.planesegRansac(gcloud, td);
+    /*if(IS_SPARSE){
+        float td = 0.2;
+	    gcloud = seg.planesegRansac(gcloud, td);
+    }*/
 	//io.writePcdFile("ransac ground cloud.pcd", fitcloud);
 	//Projection
 	//pcXYZIPtr pgcloud(new pcXYZI());
-    //pgcloud = seg.groundprojection(gcloud);
+    //cout << "RANSAC is finished !!" << endl;
+    //gcloud = seg.groundprojection(gcloud);
 	  //io.writePcdFile("projected groundcloud.pcd", pgcloud);
     //io.displayGroundwithIntensities(fitcloud, 0.3, 0);
 
@@ -304,12 +311,14 @@ int main(int argc, char *argv[])
     //5.2.1. Image Thresholding using Max Entropy Segmentation (All self-adaptive)
     // Image 7
     imgZbinary = ip.maxEntropySegMentation(imgZgradient);
+    // ip.OtsuSegMentation(imgZgradient);
     //int maxroadslope = 50;  // Setting the threshold for Surface Roughness, 50/255 here
     //threshold(imgZgradient, imgZbinary, maxroadslope, 1, CV_THRESH_BINARY);
     if (datatype == 1)
     {
         // Image 8
-        imgDbinary = ip.maxEntropySegMentation(imgD); // for MLS
+        imgDbinary = ip.maxEntropySegMentation(imgD);
+        // ip.OtsuSegMentation(imgD); // for MLS
         // Image 9
         if(!IS_SPARSE)
             imgIgradientroad = ip.ExtractRoadPixelIZD(imgIgradient, imgZbinary, imgDbinary); //Use the slope and point density as the criterion
@@ -324,8 +333,10 @@ int main(int argc, char *argv[])
     else if (datatype == 2)
         imgIgradientroad = ip.ExtractRoadPixelIZ(imgIgradient, imgZbinary); //for ALS
     // Image 10
-    // Apply morpholofical operation here as 
-    imgIbinary = ip.maxEntropySegMentation(imgIgradientroad);
+    
+    //imgIbinary = ip.maxEntropySegMentation(imgIgradientroad);
+    imgIbinary = ip.OtsuSegMentation(imgIgradientroad);
+    
     // dilate_element = getStructuringElement(MORPH_RECT, Size(5, 5));
     //open_element = getStructuringElement(MORPH_RECT, Size(3, 3));
     // dilate(imgIbinary, imgIbinary, dilate_element);
@@ -339,7 +350,7 @@ int main(int argc, char *argv[])
     //5.3. Intensity Image Connected Component Analysis (CCA) and Labeling
     float smallregion;
     if (datatype == 1)
-        smallregion = 0.4 / (resolution * resolution); //Pixel Number Threshold: 0.6 m^2 as the threshold for small connected region. Manually tune parameter (0.5) here.
+        smallregion = 0.5 / (resolution * resolution); //Pixel Number Threshold: 0.6 m^2 as the threshold for small connected region. Manually tune parameter (0.5) here.
     else if (datatype == 2)
         smallregion = 0.5 / (resolution * resolution);
     ip.RemoveSmallRegion(imgIbinary, imgIbfilter, smallregion); //CCA Filtering (Problem: It's inefficient to run CCA twice. Improve the codes later.)
@@ -406,7 +417,7 @@ int main(int argc, char *argv[])
 
     // Evaluate the marking using the intensity threshold of the Otsu method
     if(!IS_SPARSE)
-        ip.EvaluateLaneMarkings(imgFilled, pcGT);
+        ip.EvaluateLaneMarkings(imgFilled, pcGT, io.paralist.visualization_on);
     else
         ip.generatePredictionPC(imgFilled, gcloud, pcPred);
 
@@ -492,7 +503,6 @@ int main(int argc, char *argv[])
 
     if(processTimeFile.is_open()){
             processTimeFile << "Full Execution Time : " << time_used.count() << endl;
-            processTimeFile << "00000000000000000000000000000000000000000000000000000000000000000" << endl;
     }
     else{
             cout << "File: " << "time_info.txt" << " could not be opened." << endl;
@@ -513,6 +523,7 @@ int main(int argc, char *argv[])
 
         if(processTimeFile.is_open()){
                 processTimeFile << "Map Matching Execution Time : " << time_used_map.count() << endl;
+                processTimeFile << "00000000000000000000000000000000000000000000000000000000000000000" << endl;
         }
         else{
                 cout << "File: " << "time_info.txt" << " could not be opened." << endl;

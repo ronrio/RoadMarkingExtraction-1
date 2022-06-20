@@ -501,23 +501,25 @@ namespace roadmarking
 		double intensityMax = -DBL_MAX;
 		for (int i = 0; i < pointCloud->points.size(); i++)
 		{
-			if(pointCloud->points[i].intensity > intensityMax)
-				intensityMax = pointCloud->points[i].intensity;
 
-			float iAvg = 0.5;
+
+			float iAvg = 0.3;
 			//TODO: Differentiate in the configuration between Scans with scale of 1 and scale of 255 !!
 			if (pointCloud->points[i].intensity >= iAvg && pointCloud->points[i].intensity < 1.0)  // e.g. remove all pts below iAvg
 			{
-				pointCloud->points[i].intensity *= 100;
+				if(pointCloud->points[i].intensity > intensityMax)
+					intensityMax = pointCloud->points[i].intensity;
+					
+				//pointCloud->points[i].intensity *= 100;
 				// Manual filtering point cloud
-				// inliers->indices.push_back(i);
+				inliers->indices.push_back(i);
 			}
 		}
 		// Manual filtering point cloud
-		// extract.setInputCloud(pointCloud);
-		// extract.setIndices(inliers);
-		// extract.setNegative(false);
-		// extract.filter(*pointCloud);
+		extract.setInputCloud(pointCloud);
+		extract.setIndices(inliers);
+		extract.setNegative(false);
+		extract.filter(*pointCloud);
 
 		//Scaling the intensity values into 256 scale values
 		for (int i = 0; i < pointCloud->points.size(); i++)

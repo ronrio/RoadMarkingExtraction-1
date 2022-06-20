@@ -1,5 +1,5 @@
 2
-700.0
+600.0
 0.1
 5
 2
@@ -8,18 +8,17 @@
 0.15
 0.75
 20.0
-0
+1
 2.70526
 10
 0.5
 1
 1
 4
-60
+50
 3
 0
 1
-
 --------------------------------------------------------------------------------------------------------------------------------------------
 Parameters Notification
 1 road_type （1: highway, 2: urban road) default: 2
@@ -38,7 +37,7 @@ Parameters Notification
 14 fuse_factor (the fuse weight for each line, in the default case each line contributes equally) default: 0.5
 15 rho_res (resoultion of the rho parameter for Hough Algorithm, in pixels) default: 1
 16 theta_res (resoultion of the theta parameter for Hough Algorithm, in degrees) default: 1
-17 decimal_tol (controls the number of decimals to tolerate angle difference among a group of parallel lines): default: 1
+17 decimal_tol (controls the number of decimals to tolerate angle difference among a group of parallel lines): default: 4
 18 vote_thres (number of votes needed by the Hough algorithm to detect a line, the higher, the more robust is the detection with less lines) default: 100
 19 marking_width (controls the width of a detected marking, in pixels. Relative to the grid resolution,the marking width can be tuned) default 3
 20 IS_SPARSE (A flag indicating if the scan used for processing is dense or sparse) default 0

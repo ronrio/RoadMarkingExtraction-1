@@ -17,8 +17,8 @@
 #include <boost/filesystem.hpp>
 
 //ROOT
-#include <TLinearFitter.h>
-#include <TMatrixT.h>
+//#include <TLinearFitter.h>
+//#include <TMatrixT.h>
 #include <Math/RootFinder.h>
 #include <Math/Polynomial.h>
 // #include <SpecFuncCephes.h>
@@ -60,7 +60,8 @@ namespace roadmarking
 		  cv::Mat Sobelboundary(cv::Mat img0);                                                  //Sobel
 		  
 		  float caculateCurrentEntropy(cv::Mat hist, int threshold);                      
-		  cv::Mat maxEntropySegMentation(cv::Mat inputImage);                                 
+		  cv::Mat maxEntropySegMentation(cv::Mat inputImage); 
+		  cv::Mat OtsuSegMentation(cv::Mat inputImage);                                
 		  cv::Mat ExtractRoadPixelIZD(const cv::Mat & _binI,const cv::Mat & _binZ,const cv::Mat & _binD); //(for MLS)
 		  cv::Mat ExtractRoadPixelIZ (const cv::Mat & _binI,const cv::Mat & _binZ);                   //(for ALS)
 
@@ -93,7 +94,7 @@ namespace roadmarking
 		  cv::Mat getNonZeroIdx(vector<cv::Vec2f> houghLines, cv::Mat img_h, int off_y, int off_x);
 
 		  // Label PC in Filttered intensity image 2 for marking and 0 eitherwise
-		  void EvaluateLaneMarkings(const cv::Mat & imgFilled, pcXYZRGBPtr& pcGT);
+		  void EvaluateLaneMarkings(const cv::Mat & imgFilled, pcXYZRGBPtr& pcGT, bool VISUALIZE);
 		  void generatePredictionPC(const cv::Mat & imgFilled, const pcXYZIPtr &cloud, pcXYZRGBPtr& pcPred);
 		  int nx, ny; //pixel number
 		  int timin, tjmin; //truncated pixel no.
@@ -141,7 +142,7 @@ namespace roadmarking
 					*x = val;
 				return xs;
 			}
-			// vector<cv::Point> robustFitting(vector<cv::Point>, cv::Size img_bounds);
+			vector<cv::Point> robustFitting(vector<cv::Point> data_points, cv::Size img_bounds);
 			// vector<cv::Vec2f> adjustLines(const vector<Vec2f> &houghLines, const double& rot_angle);
 			void visualizePredToGT (const pcXYZRGBPtr & IoU);
 
